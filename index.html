@@ -149,7 +149,9 @@
               </select>
             </div>
             <div class="field">
-              <label for="recipe-fermentation-time">Tempo total de fermentação</label>
+              <label for="recipe-fermentation-time"
+                >Tempo total de fermentação da massa</label
+              >
               <div class="input-affix has-suffix">
                 <input
                   id="recipe-fermentation-time"
@@ -162,6 +164,18 @@
                 />
                 <span class="input-affix__suffix">horas</span>
               </div>
+            </div>
+            <div class="field">
+              <label for="recipe-fermentation-temp">Temperatura da fermentação</label>
+              <select
+                id="recipe-fermentation-temp"
+                name="recipeFermentationTemperature"
+              >
+                <option value="">Selecione</option>
+                <option value="TA">Temperatura ambiente (TA)</option>
+                <option value="TC">Temperatura controlada (TC)</option>
+                <option value="Mista">Mista (TA + TC)</option>
+              </select>
             </div>
             <section id="preferment-fields" class="form-subsection is-hidden">
               <h4>Pré-fermento</h4>
@@ -239,6 +253,38 @@
             </p>
             <div class="field field-inline">
               <div class="field">
+                <label for="formula-dough-count">Quantas massas você precisa?</label>
+                <input
+                  id="formula-dough-count"
+                  name="formulaDoughCount"
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputmode="numeric"
+                  placeholder="Ex: 4"
+                />
+              </div>
+              <div class="field">
+                <label for="formula-dough-weight">Peso alvo de cada massa</label>
+                <div class="input-affix has-suffix">
+                  <input
+                    id="formula-dough-weight"
+                    name="formulaDoughWeight"
+                    type="number"
+                    min="50"
+                    step="5"
+                    inputmode="decimal"
+                    value="260"
+                  />
+                  <span class="input-affix__suffix">g</span>
+                </div>
+                <span class="field-hint"
+                  >Usamos 260&nbsp;g como ponto de partida.</span
+                >
+              </div>
+            </div>
+            <div class="field field-inline">
+              <div class="field">
                 <label for="formula-total-flour">Farinha total</label>
                 <div class="input-affix has-suffix">
                   <input
@@ -250,12 +296,17 @@
                     inputmode="decimal"
                     placeholder="Ex: 1000"
                     required
+                    readonly
                   />
                   <span class="input-affix__suffix">g</span>
                 </div>
+                <span class="field-hint"
+                  >Pré-calculado a partir das massas desejadas. Ajuste os parâmetros
+                  acima para mudar.</span
+                >
               </div>
               <div class="field">
-                <label for="formula-water">Hidratação desejada</label>
+                <label for="formula-water">Hidratação final desejada</label>
                 <div class="input-affix has-suffix">
                   <input
                     id="formula-water"
@@ -274,7 +325,7 @@
             </div>
             <div class="field field-inline">
               <div class="field">
-                <label for="formula-salt">Sal</label>
+                <label for="formula-salt">Sal (%)</label>
                 <div class="input-affix has-suffix">
                   <input
                     id="formula-salt"
@@ -288,6 +339,7 @@
                   />
                   <span class="input-affix__suffix">%</span>
                 </div>
+                <span class="field-hint">Percentual sobre a farinha total.</span>
               </div>
               <div class="field">
                 <label for="formula-yeast">Fermento (gramas)</label>
@@ -305,6 +357,31 @@
                 </div>
               </div>
             </div>
+            <details class="formula-help">
+              <summary>Sugestões de fermento por temperatura</summary>
+              <ul>
+                <li>
+                  <strong>TA 20&nbsp;°C a 24&nbsp;°C:</strong> 0,1% a 0,2% da farinha
+                  para fermentações longas (&gt;18h)
+                </li>
+                <li>
+                  <strong>TA 24&nbsp;°C a 28&nbsp;°C:</strong> 0,2% a 0,4% para 12h a
+                  18h
+                </li>
+                <li>
+                  <strong>Controlada &lt; 6&nbsp;°C:</strong> 0,05% a 0,1% com maturação
+                  lenta (24h+)
+                </li>
+                <li>
+                  <strong>Mista (TA + TC):</strong> 0,15% a 0,25% dependendo do tempo em
+                  cada etapa
+                </li>
+              </ul>
+              <p class="formula-help__note">
+                Ajuste conforme a força da farinha e a rotina da produção. Valores
+                maiores aceleram a fermentação.
+              </p>
+            </details>
             <div class="field field-inline">
               <div class="field">
                 <label for="formula-fat">Gordura (opcional)</label>
@@ -386,6 +463,10 @@
             <div>
               <dt>Fermentação</dt>
               <dd id="success-recipe-fermentation">—</dd>
+            </div>
+            <div>
+              <dt>Temperatura</dt>
+              <dd id="success-recipe-temperature">—</dd>
             </div>
             <div>
               <dt>Hidratação</dt>
@@ -683,9 +764,22 @@
           </figure>
           <dl class="recipe-card__facts"></dl>
           <p class="recipe-card__notes"></p>
+          <div class="recipe-card__sections">
+            <section class="recipe-card__section">
+              <h4>Blend de farinhas</h4>
+              <ul class="recipe-card__blend"></ul>
+            </section>
+            <section class="recipe-card__section">
+              <h4>Fórmula de padeiro</h4>
+              <ul class="recipe-card__formula"></ul>
+            </section>
+          </div>
         </div>
         <footer class="recipe-card__footer">
           <strong class="recipe-card__average"></strong>
+          <div class="recipe-card__actions">
+            <button type="button" class="recipe-card__delete">Apagar receita</button>
+          </div>
           <details>
             <summary>Histórico de avaliações</summary>
             <ul class="recipe-card__ratings"></ul>
@@ -742,6 +836,9 @@
             </div>
           </dl>
         </details>
+        <footer class="flour-card__actions">
+          <button type="button" class="flour-card__delete">Apagar</button>
+        </footer>
       </article>
     </template>
 

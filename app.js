@@ -34,6 +34,9 @@
   const successRecipePreferment = document.querySelector(
     "#success-recipe-preferment"
   );
+  const successRecipeTemperature = document.querySelector(
+    "#success-recipe-temperature"
+  );
   const recipeStyleSelect = document.querySelector("#recipe-style");
   const recipeStyleCustomGroup = document.querySelector(
     "#recipe-style-custom-group"
@@ -64,6 +67,20 @@
   const prefermentMaturationInput = document.querySelector(
     "#preferment-maturation"
   );
+  const formulaDoughCountInput = document.querySelector(
+    "#formula-dough-count"
+  );
+  const formulaDoughWeightInput = document.querySelector(
+    "#formula-dough-weight"
+  );
+  const formulaTotalFlourInput = document.querySelector(
+    "#formula-total-flour"
+  );
+  const formulaWaterInput = document.querySelector("#formula-water");
+  const formulaSaltInput = document.querySelector("#formula-salt");
+  const formulaYeastInput = document.querySelector("#formula-yeast");
+  const formulaFatInput = document.querySelector("#formula-fat");
+  const formulaSugarInput = document.querySelector("#formula-sugar");
   const successFlourBlendList = document.querySelector("#success-flour-blend");
   const successFormulaList = document.querySelector("#success-formula");
   const flourListContainer = document.querySelector("#flour-list");
@@ -267,6 +284,16 @@
     return `${decimalFormatter.format(numeric)} ${label}`;
   }
 
+  function formatFermentationTemperature(value) {
+    const labels = {
+      TA: "Temperatura ambiente (TA)",
+      TC: "Temperatura controlada (TC)",
+      Mista: "Mista (TA + TC)",
+    };
+    if (!value) return "";
+    return labels[value] || value;
+  }
+
   function formatDateOnly(isoString) {
     if (!isoString) return "";
     const date = new Date(isoString);
@@ -338,7 +365,7 @@
     }
     const flourShareValue = parseNumeric(preferment.percentage);
     if (flourShareValue !== null) {
-      parts.push(`${decimalFormatter.format(flourShareValue)}% da farinha`);
+      parts.push(`${decimalFormatter.format(flourShareValue)}% da farinha total`);
     }
     const maturationValue = parseNumeric(preferment.maturation);
     if (maturationValue !== null) {
@@ -348,6 +375,229 @@
       parts.push(`${formatWeight(preferment.totalWeight)}`);
     }
     return parts.join(" • ") || "Pré-fermento configurado";
+  }
+
+  function renderFlourBlendList(container, blend) {
+    if (!container) return;
+    container.innerHTML = "";
+    if (!Array.isArray(blend) || !blend.length) {
+      const fallback = document.createElement("li");
+      fallback.textContent = "Blend não informado.";
+      container.appendChild(fallback);
+      return;
+    }
+
+    blend.forEach((item) => {
+      const listItem = document.createElement("li");
+      const parts = [];
+      const percentageValue = parseNumeric(item.percentage);
+      if (percentageValue !== null) {
+        parts.push(`${decimalFormatter.format(percentageValue)}%`);
+      }
+      const name = item.name || "Farinha";
+      const infoParts = [];
+      if (item.reference?.type) infoParts.push(item.reference.type);
+      const proteinValue = parseNumeric(item.reference?.protein);
+      if (proteinValue !== null) {
+        infoParts.push(`${decimalFormatter.format(proteinValue)}% prot`);
+      }
+      const strengthValue = parseNumeric(item.reference?.strength);
+      if (strengthValue !== null) {
+        infoParts.push(`W ${Math.round(strengthValue)}`);
+      }
+      const infoLabel = infoParts.length ? ` (${infoParts.join(", ")})` : "";
+      parts.push(`${name}${infoLabel}`);
+      const weightLabel = formatWeight(item.weight);
+      if (weightLabel) {
+        parts.push(weightLabel);
+      }
+      listItem.textContent = parts.join(" — ");
+      container.appendChild(listItem);
+    });
+  }
+
+  function renderFormulaList(container, details) {
+    if (!container) return;
+    container.innerHTML = "";
+    if (!details || typeof details !== "object") {
+      const fallback = document.createElement("li");
+      fallback.textContent = "Sem dados de formulação.";
+      container.appendChild(fallback);
+      return;
+    }
+
+    const items = [];
+    if (Number.isFinite(details.doughCount) && parseNumeric(details.doughBallWeight) !== null) {
+      const ballWeightLabel = formatWeight(details.doughBallWeight);
+      const totalLabel = formatWeight(details.targetDoughWeight ?? details.totalDoughWeight);
+      const countLabel = Math.round(details.doughCount);
+      const segments = [`Massas: ${countLabel} × ${ballWeightLabel}`];
+      if (totalLabel) {
+        segments.push(`= ${totalLabel}`);
+      }
+      items.push(segments.join(" "));
+    }
+
+    const formula = details.formula || {};
+    const totals = formula.totals || {};
+    const percentages = formula.percentages || {};
+
+    const totalFlourWeight = parseNumeric(formula.totalFlour);
+    if (totalFlourWeight !== null) {
+      items.push(`Farinha total: ${formatWeight(totalFlourWeight)}`);
+    }
+
+    const waterWeight = parseNumeric(totals.water);
+    if (waterWeight !== null) {
+      const waterParts = [`Água: ${formatWeight(waterWeight)}`];
+      const waterPct = formatPercentage(percentages.water);
+      if (waterPct) waterParts.push(`(${waterPct})`);
+      items.push(waterParts.join(" "));
+    }
+
+    const saltWeight = parseNumeric(totals.salt);
+    if (saltWeight !== null) {
+      const saltParts = [`Sal: ${formatWeight(saltWeight)}`];
+      const saltPct = formatPercentage(percentages.salt);
+      if (saltPct) saltParts.push(`(${saltPct})`);
+      items.push(saltParts.join(" "));
+    }
+
+    const yeastWeight = parseNumeric(totals.yeast);
+    if (yeastWeight !== null) {
+      const yeastParts = [`Fermento: ${formatWeight(yeastWeight)}`];
+      const yeastPct = formatPercentage(percentages.yeast);
+      if (yeastPct) yeastParts.push(`(${yeastPct})`);
+      items.push(yeastParts.join(" "));
+    }
+
+    const fatWeight = parseNumeric(totals.fat);
+    if (fatWeight !== null) {
+      const fatParts = [`Gordura: ${formatWeight(fatWeight)}`];
+      const fatPct = formatPercentage(percentages.fat);
+      if (fatPct) fatParts.push(`(${fatPct})`);
+      items.push(fatParts.join(" "));
+    }
+
+    const sugarWeight = parseNumeric(totals.sugar);
+    if (sugarWeight !== null) {
+      const sugarParts = [`Açúcares: ${formatWeight(sugarWeight)}`];
+      const sugarPct = formatPercentage(percentages.sugar);
+      if (sugarPct) sugarParts.push(`(${sugarPct})`);
+      items.push(sugarParts.join(" "));
+    }
+
+    const mixFlourWeight = parseNumeric(totals.mixFlour);
+    const mixWaterWeight = parseNumeric(totals.mixWater);
+    if (mixFlourWeight !== null || mixWaterWeight !== null) {
+      const mixParts = [];
+      if (mixFlourWeight !== null) mixParts.push(`farinha ${formatWeight(mixFlourWeight)}`);
+      if (mixWaterWeight !== null) mixParts.push(`água ${formatWeight(mixWaterWeight)}`);
+      if (mixParts.length) {
+        items.push(`Massa final (antes dos demais ingredientes): ${mixParts.join(" + ")}`);
+      }
+    }
+
+    if (details.preferment && typeof details.preferment === "object") {
+      const prefermentWeight = formatWeight(details.preferment.totalWeight);
+      const prefermentParts = [];
+      if (details.preferment.type) prefermentParts.push(details.preferment.type);
+      const inoculationValue = parseNumeric(details.preferment.inoculation);
+      if (inoculationValue !== null) {
+        prefermentParts.push(`${decimalFormatter.format(inoculationValue)}% inoc.`);
+      }
+      const hydrationValue = parseNumeric(details.preferment.hydration);
+      if (hydrationValue !== null) {
+        prefermentParts.push(`${decimalFormatter.format(hydrationValue)}% hidr.`);
+      }
+      const flourShare = parseNumeric(details.preferment.percentage);
+      if (flourShare !== null) {
+        prefermentParts.push(`${decimalFormatter.format(flourShare)}% da farinha total`);
+      }
+      const maturationValue = parseNumeric(details.preferment.maturation);
+      if (maturationValue !== null) {
+        prefermentParts.push(`${decimalFormatter.format(maturationValue)}h maturação`);
+      }
+      const breakdown = [];
+      if (parseNumeric(details.preferment.flour) !== null) {
+        breakdown.push(`farinha ${formatWeight(details.preferment.flour)}`);
+      }
+      if (parseNumeric(details.preferment.water) !== null) {
+        breakdown.push(`água ${formatWeight(details.preferment.water)}`);
+      }
+      const breakdownLabel = breakdown.length ? ` (${breakdown.join(" + ")})` : "";
+      const prefermentLabel = prefermentParts.length ? ` (${prefermentParts.join(" • ")})` : "";
+      items.push(`Pré-fermento: ${prefermentWeight || "—"}${breakdownLabel}${prefermentLabel}`);
+    }
+
+    const totalDough = formatWeight(details.totalDoughWeight);
+    if (totalDough) {
+      items.push(`Massa total estimada: ${totalDough}`);
+    }
+
+    if (!items.length) {
+      const fallback = document.createElement("li");
+      fallback.textContent = "Sem dados de formulação.";
+      container.appendChild(fallback);
+      return;
+    }
+
+    items.forEach((text) => {
+      const listItem = document.createElement("li");
+      listItem.textContent = text;
+      container.appendChild(listItem);
+    });
+  }
+
+  function computeTotalFlourFromTargets({
+    doughCount,
+    doughWeight,
+    waterPct,
+    saltPct,
+    fatPct,
+    sugarPct,
+    yeastWeight,
+  }) {
+    const count = parseNumeric(doughCount);
+    const ballWeight = parseNumeric(doughWeight);
+    const water = parseNumeric(waterPct);
+    if (!count || !ballWeight || water === null) return null;
+
+    const salt = parseNumeric(saltPct) ?? 0;
+    const fat = parseNumeric(fatPct) ?? 0;
+    const sugar = parseNumeric(sugarPct) ?? 0;
+    const yeast = parseNumeric(yeastWeight) ?? 0;
+
+    const totalDoughTarget = count * ballWeight;
+    if (totalDoughTarget <= 0) return null;
+
+    const percentageFactor = 1 + (water + salt + fat + sugar) / 100;
+    if (percentageFactor <= 0) return null;
+
+    const flour = (totalDoughTarget - yeast) / percentageFactor;
+    if (!Number.isFinite(flour) || flour <= 0) return null;
+    return flour;
+  }
+
+  function calculateAutoFlour() {
+    if (!formulaTotalFlourInput) return;
+    const flour = computeTotalFlourFromTargets({
+      doughCount: formulaDoughCountInput?.value,
+      doughWeight: formulaDoughWeightInput?.value,
+      waterPct: formulaWaterInput?.value,
+      saltPct: formulaSaltInput?.value,
+      fatPct: formulaFatInput?.value,
+      sugarPct: formulaSugarInput?.value,
+      yeastWeight: formulaYeastInput?.value,
+    });
+
+    if (flour !== null) {
+      const rounded = Math.round(flour);
+      formulaTotalFlourInput.value = String(rounded);
+      formulaTotalFlourInput.dataset.autoValue = String(rounded);
+    } else if (formulaTotalFlourInput.dataset.autoValue) {
+      delete formulaTotalFlourInput.dataset.autoValue;
+    }
   }
 
   function getRecipeDetails(recipe) {
@@ -401,9 +651,15 @@
         : recipe.flour ?? recipe.recipeFlour ?? flourReference?.name ?? "";
     const flourLabel = flourBlendSummary || formatFlourDetails(flourReference, flourName);
 
-    const formula = recipe.formula && typeof recipe.formula === "object"
-      ? recipe.formula
-      : {};
+    const rawFormula =
+      recipe.formula && typeof recipe.formula === "object"
+        ? recipe.formula
+        : {};
+    const formula = {
+      ...rawFormula,
+      percentages: { ...(rawFormula.percentages || {}) },
+      totals: { ...(rawFormula.totals || {}) },
+    };
     const hydration =
       parseNumeric(formula.percentages?.water) ??
       recipe.hydration ??
@@ -412,9 +668,44 @@
     const totalDoughWeight =
       parseNumeric(
         formula.totals?.totalDoughWeight ??
-          formula.totalDoughWeight ??
+        formula.totalDoughWeight ??
           formula.totals?.totalWeight
       );
+
+    const rawFormulation =
+      recipe.formulation && typeof recipe.formulation === "object"
+        ? recipe.formulation
+        : rawFormula.meta && typeof rawFormula.meta === "object"
+        ? rawFormula.meta
+        : {};
+
+    const doughCount = parseNumeric(rawFormulation.doughCount);
+    const doughBallWeight = parseNumeric(
+      rawFormulation.doughBallWeight ?? rawFormulation.ballWeight
+    );
+    let targetDoughWeight = parseNumeric(
+      rawFormulation.targetDoughWeight ?? rawFormulation.targetWeight
+    );
+    if (
+      targetDoughWeight === null &&
+      doughCount &&
+      doughBallWeight !== null &&
+      doughBallWeight > 0
+    ) {
+      targetDoughWeight = doughCount * doughBallWeight;
+    }
+    formula.meta = {
+      ...formula.meta,
+      doughCount: Number.isFinite(doughCount) ? doughCount : null,
+      doughBallWeight:
+        doughBallWeight !== null && Number.isFinite(doughBallWeight)
+          ? doughBallWeight
+          : null,
+      targetDoughWeight:
+        targetDoughWeight !== null && Number.isFinite(targetDoughWeight)
+          ? targetDoughWeight
+          : null,
+    };
 
     const notes =
       recipe.notes ??
@@ -430,9 +721,16 @@
 
     const prefermentLabel = formatPrefermentSummary(preferment);
 
+    const fermentationTemperature =
+      fermentationDetails.temperature ??
+      recipe.fermentationTemperature ??
+      recipe.temperature ??
+      "";
+
     return {
       style,
       fermentation,
+      fermentationTemperature,
       flour: flourName,
       flourLabel,
       flourBlend,
@@ -444,6 +742,9 @@
       preferment,
       prefermentLabel,
       totalDoughWeight,
+      doughCount,
+      doughBallWeight,
+      targetDoughWeight,
       flourReference,
       formula,
     };
@@ -498,6 +799,12 @@
       successRecipeFermentation.textContent =
         details.fermentation || "—";
     }
+    if (successRecipeTemperature) {
+      const temperatureLabel = formatFermentationTemperature(
+        details.fermentationTemperature
+      );
+      successRecipeTemperature.textContent = temperatureLabel || "—";
+    }
     if (successRecipeHydration) {
       const hydrationLabel = formatPercentage(details.hydration);
       successRecipeHydration.textContent = hydrationLabel || "—";
@@ -515,167 +822,9 @@
       successRecipeTime.textContent = timeLabel || "—";
     }
 
-    if (successFlourBlendList) {
-      successFlourBlendList.innerHTML = "";
-      if (details.flourBlend && details.flourBlend.length) {
-        details.flourBlend.forEach((item) => {
-          const listItem = document.createElement("li");
-          const percentageLabel =
-            item.percentage === null || item.percentage === undefined
-              ? ""
-              : `${decimalFormatter.format(item.percentage)}%`;
-          const weightLabel = formatWeight(item.weight);
-          const infoParts = [];
-          const proteinValue = parseNumeric(item.reference?.protein);
-          const strengthValue = parseNumeric(item.reference?.strength);
-          if (item.reference?.type) infoParts.push(item.reference.type);
-          if (proteinValue !== null) {
-            infoParts.push(`${decimalFormatter.format(proteinValue)}% prot`);
-          }
-          if (strengthValue !== null) {
-            infoParts.push(`W ${Math.round(strengthValue)}`);
-          }
-          const metaLabel = infoParts.length ? ` (${infoParts.join(", ")})` : "";
-          const segments = [];
-          if (percentageLabel) segments.push(percentageLabel);
-          segments.push(`${item.name || "Farinha"}${metaLabel}`);
-          if (weightLabel) segments.push(weightLabel);
-          listItem.textContent = segments.join(" — ");
-          successFlourBlendList.appendChild(listItem);
-        });
-      } else {
-        const listItem = document.createElement("li");
-        listItem.textContent = "Blend não informado.";
-        successFlourBlendList.appendChild(listItem);
-      }
-    }
+    renderFlourBlendList(successFlourBlendList, details.flourBlend);
 
-    if (successFormulaList) {
-      successFormulaList.innerHTML = "";
-      const formula = details.formula || {};
-      const totals = formula.totals || {};
-      const percentages = formula.percentages || {};
-      const items = [];
-
-      const totalFlourWeight = parseNumeric(formula.totalFlour);
-      if (totalFlourWeight !== null) {
-        items.push(`Farinha total: ${formatWeight(totalFlourWeight)}`);
-      }
-
-      const waterWeight = parseNumeric(totals.water);
-      if (waterWeight !== null) {
-        const waterParts = [`Água: ${formatWeight(waterWeight)}`];
-        const waterPct = formatPercentage(percentages.water);
-        if (waterPct) {
-          waterParts.push(`(${waterPct})`);
-        }
-        items.push(waterParts.join(" "));
-      }
-
-      const saltWeight = parseNumeric(totals.salt);
-      if (saltWeight !== null) {
-        const saltParts = [`Sal: ${formatWeight(saltWeight)}`];
-        const saltPctLabel = formatPercentage(percentages.salt);
-        if (saltPctLabel) {
-          saltParts.push(`(${saltPctLabel})`);
-        }
-        items.push(saltParts.join(" "));
-      }
-
-      const yeastWeight = parseNumeric(totals.yeast);
-      if (yeastWeight !== null) {
-        const yeastParts = [`Fermento: ${formatWeight(yeastWeight)}`];
-        const yeastPctLabel = formatPercentage(percentages.yeast);
-        if (yeastPctLabel) {
-          yeastParts.push(`(${yeastPctLabel})`);
-        }
-        items.push(yeastParts.join(" "));
-      }
-
-      const fatWeight = parseNumeric(totals.fat);
-      if (fatWeight !== null) {
-        const fatParts = [`Gordura: ${formatWeight(fatWeight)}`];
-        const fatPctLabel = formatPercentage(percentages.fat);
-        if (fatPctLabel) {
-          fatParts.push(`(${fatPctLabel})`);
-        }
-        items.push(fatParts.join(" "));
-      }
-
-      const sugarWeight = parseNumeric(totals.sugar);
-      if (sugarWeight !== null) {
-        const sugarParts = [`Açúcares: ${formatWeight(sugarWeight)}`];
-        const sugarPctLabel = formatPercentage(percentages.sugar);
-        if (sugarPctLabel) {
-          sugarParts.push(`(${sugarPctLabel})`);
-        }
-        items.push(sugarParts.join(" "));
-      }
-
-      const mixFlourWeight = parseNumeric(totals.mixFlour);
-      const mixWaterWeight = parseNumeric(totals.mixWater);
-      if (mixFlourWeight !== null || mixWaterWeight !== null) {
-        const parts = [];
-        if (mixFlourWeight !== null) parts.push(`farinha ${formatWeight(mixFlourWeight)}`);
-        if (mixWaterWeight !== null) parts.push(`água ${formatWeight(mixWaterWeight)}`);
-        if (parts.length) {
-          items.push(`Massa final (antes dos demais ingredientes): ${parts.join(" + ")}`);
-        }
-      }
-
-      if (details.preferment && typeof details.preferment === "object") {
-        const prefermentWeight = formatWeight(details.preferment.totalWeight);
-        const prefermentParts = [];
-        if (details.preferment.type) prefermentParts.push(details.preferment.type);
-        const inoculationValue = parseNumeric(details.preferment.inoculation);
-        if (inoculationValue !== null) {
-          prefermentParts.push(`${decimalFormatter.format(inoculationValue)}% inoc.`);
-        }
-        const hydrationValue = parseNumeric(details.preferment.hydration);
-        if (hydrationValue !== null) {
-          prefermentParts.push(`${decimalFormatter.format(hydrationValue)}% hidr.`);
-        }
-        const flourShare = parseNumeric(details.preferment.percentage);
-        if (flourShare !== null) {
-          prefermentParts.push(
-            `${decimalFormatter.format(flourShare)}% da farinha total`
-          );
-        }
-        if (details.preferment.maturation !== undefined && details.preferment.maturation !== null) {
-          const maturationValue = parseNumeric(details.preferment.maturation);
-          if (maturationValue !== null) {
-            prefermentParts.push(`${decimalFormatter.format(maturationValue)}h maturação`);
-          }
-        }
-        const flourWeight = formatWeight(details.preferment.flour);
-        const waterWeightPreferment = formatWeight(details.preferment.water);
-        const breakdown = [];
-        if (flourWeight) breakdown.push(`farinha ${flourWeight}`);
-        if (waterWeightPreferment) breakdown.push(`água ${waterWeightPreferment}`);
-        const breakdownLabel = breakdown.length ? ` (${breakdown.join(" + ")})` : "";
-        const prefermentLabel = prefermentParts.length ? ` (${prefermentParts.join(" • ")})` : "";
-        items.push(
-          `Pré-fermento: ${prefermentWeight || "—"}${breakdownLabel}${prefermentLabel}`
-        );
-      }
-
-      const totalDough = parseNumeric(totals.totalDoughWeight ?? details.totalDoughWeight);
-      if (totalDough !== null) {
-        items.push(`Massa total estimada: ${formatWeight(totalDough)}`);
-      }
-
-      if (items.length) {
-        items.forEach((text) => {
-          const listItem = document.createElement("li");
-          listItem.textContent = text;
-          successFormulaList.appendChild(listItem);
-        });
-      } else {
-        const listItem = document.createElement("li");
-        listItem.textContent = "Parâmetros ainda não informados.";
-        successFormulaList.appendChild(listItem);
-      }
-    }
+    renderFormulaList(successFormulaList, details);
 
     successPanel.classList.remove("is-hidden");
     successPanel.removeAttribute("hidden");
@@ -729,18 +878,35 @@
           }
         }
 
-          const factsList = article.querySelector(".recipe-card__facts");
-          if (factsList) {
-            factsList.innerHTML = "";
-            const facts = [
-              ["Estilo", details.style],
-              ["Farinha", details.flourLabel || details.flour],
-              ["Fermentação", details.fermentation],
-              ["Pré-fermento", details.prefermentLabel],
-              ["Hidratação", formatPercentage(details.hydration)],
-              ["Massa total", formatWeight(details.totalDoughWeight)],
-              ["Tempo total", formatHours(details.fermentationTime)],
-            ];
+        const factsList = article.querySelector(".recipe-card__facts");
+        if (factsList) {
+          factsList.innerHTML = "";
+          const facts = [];
+          facts.push(["Estilo", details.style]);
+          facts.push(["Farinha", details.flourLabel || details.flour]);
+          facts.push(["Fermentação", details.fermentation]);
+          facts.push([
+            "Temperatura",
+            formatFermentationTemperature(details.fermentationTemperature),
+          ]);
+          if (
+            Number.isFinite(details.doughCount) &&
+            parseNumeric(details.doughBallWeight) !== null
+          ) {
+            const countLabel = Math.round(details.doughCount);
+            const ballWeightLabel = formatWeight(details.doughBallWeight);
+            const totalLabel = formatWeight(
+              details.targetDoughWeight ?? details.totalDoughWeight
+            );
+            const massesLabel = totalLabel
+              ? `${countLabel} × ${ballWeightLabel} = ${totalLabel}`
+              : `${countLabel} × ${ballWeightLabel}`;
+            facts.push(["Massas", massesLabel]);
+          }
+          facts.push(["Pré-fermento", details.prefermentLabel]);
+          facts.push(["Hidratação", formatPercentage(details.hydration)]);
+          facts.push(["Massa total", formatWeight(details.totalDoughWeight)]);
+          facts.push(["Tempo total", formatHours(details.fermentationTime)]);
 
           facts
             .filter(([, value]) => Boolean(value))
@@ -800,6 +966,18 @@
           const item = document.createElement("li");
           item.textContent = "Sem avaliações registradas.";
           ratingsList.appendChild(item);
+        }
+
+        const blendList = article.querySelector(".recipe-card__blend");
+        renderFlourBlendList(blendList, details.flourBlend);
+
+        const formulaList = article.querySelector(".recipe-card__formula");
+        renderFormulaList(formulaList, details);
+
+        const deleteButton = article.querySelector(".recipe-card__delete");
+        if (deleteButton) {
+          deleteButton.dataset.id = recipe.id;
+          deleteButton.addEventListener("click", () => handleRecipeDelete(recipe));
         }
 
         recipeListContainer.appendChild(article);
@@ -914,8 +1092,15 @@
       const editFallback = document.createElement("button");
       editFallback.type = "button";
       editFallback.textContent = "Editar";
+      editFallback.className = "flour-card__edit";
       editFallback.addEventListener("click", () => openFlourForm(flour));
       card.appendChild(editFallback);
+      const deleteFallback = document.createElement("button");
+      deleteFallback.type = "button";
+      deleteFallback.textContent = "Apagar";
+      deleteFallback.className = "flour-card__delete";
+      deleteFallback.addEventListener("click", () => handleFlourDelete(flour));
+      card.appendChild(deleteFallback);
       return card;
     }
 
@@ -998,6 +1183,12 @@
         const latest = state.flours.find((item) => item.id === flour.id) ?? flour;
         openFlourForm(latest);
       });
+    }
+
+    const deleteButton = card.querySelector(".flour-card__delete");
+    if (deleteButton) {
+      deleteButton.dataset.id = flour.id;
+      deleteButton.addEventListener("click", () => handleFlourDelete(flour));
     }
 
     return card;
@@ -1236,6 +1427,37 @@
     if (flourFilterProtein) flourFilterProtein.value = "all";
     if (flourFilterStrength) flourFilterStrength.value = "all";
     renderFlourList();
+  }
+
+  function handleRecipeDelete(recipe) {
+    if (!recipe || !recipe.id) return;
+    const label = recipe.name || "Receita sem nome";
+    const shouldRemove = window.confirm(
+      `Apagar "${label}"? Essa ação não pode ser desfeita.`
+    );
+    if (!shouldRemove) return;
+
+    state.recipes = state.recipes.filter((item) => item.id !== recipe.id);
+    safeStorage.save(state.recipes);
+    syncUI();
+    showFeedback(`Receita "${label}" removida.`);
+  }
+
+  function handleFlourDelete(flour) {
+    if (!flour || !flour.id) return;
+    const label = flour.name || "Farinha sem nome";
+    const shouldRemove = window.confirm(
+      `Apagar a farinha "${label}"?`
+    );
+    if (!shouldRemove) return;
+
+    state.flours = state.flours.filter((item) => item.id !== flour.id);
+    flourStorage.save(state.flours);
+    updateFlourTypeFilterOptions();
+    renderFlourList();
+    updateAllBlendSelectOptions();
+    updateBlendTotal();
+    showFeedback(`Farinha "${label}" removida.`);
   }
  
   function toggleStyleCustomField(value) {
@@ -1513,6 +1735,17 @@
         handleRecipeStyleChange();
       }
       resetBlendRows();
+      if (formulaDoughCountInput) {
+        formulaDoughCountInput.value = "";
+      }
+      if (formulaDoughWeightInput) {
+        formulaDoughWeightInput.value = "260";
+      }
+      if (formulaTotalFlourInput) {
+        formulaTotalFlourInput.value = "";
+        delete formulaTotalFlourInput.dataset.autoValue;
+      }
+      calculateAutoFlour();
       if (recipeFermentationSelect) {
         togglePrefermentSection(recipeFermentationSelect.value);
       }
@@ -1642,6 +1875,18 @@
       }
     }
 
+    const fermentationTemperature = (
+      formData.get("recipeFermentationTemperature") || ""
+    )
+      .toString()
+      .trim();
+
+    const doughCount = parseNumeric(formData.get("formulaDoughCount"));
+    let doughBallWeight = parseNumeric(formData.get("formulaDoughWeight"));
+    if (doughBallWeight === null || doughBallWeight <= 0) {
+      doughBallWeight = 260;
+    }
+
     const fermentationMethod = (
       formData.get("recipeFermentation") || ""
     )
@@ -1760,11 +2005,7 @@
     };
 
     const totalFlourInput = formData.get("formulaTotalFlour");
-    const totalFlour = parseNumeric(totalFlourInput);
-    if (totalFlour === null || totalFlour <= 0) {
-      showFeedback("Informe a quantidade total de farinha (em gramas).");
-      return;
-    }
+    let totalFlour = parseNumeric(totalFlourInput);
 
     const waterPct = parsePositivePercentage(
       formData.get("formulaWaterPct"),
@@ -1815,6 +2056,29 @@
       return;
     }
     const sugarPct = sugarPctRaw;
+
+    const autoFlour = computeTotalFlourFromTargets({
+      doughCount,
+      doughWeight: doughBallWeight,
+      waterPct,
+      saltPct,
+      fatPct,
+      sugarPct,
+      yeastWeight,
+    });
+    if (autoFlour !== null) {
+      totalFlour = autoFlour;
+      if (formulaTotalFlourInput) {
+        const roundedAuto = Math.round(autoFlour);
+        formulaTotalFlourInput.value = String(roundedAuto);
+        formulaTotalFlourInput.dataset.autoValue = String(roundedAuto);
+      }
+    }
+
+    if (totalFlour === null || totalFlour <= 0) {
+      showFeedback("Informe a quantidade total de farinha (em gramas).");
+      return;
+    }
 
     const prefermentEnabled = fermentationMethod !== "Direta";
     let prefermentInfo = null;
@@ -1917,14 +2181,18 @@
       prefermentInfo.flour = round(prefermentFlourRaw);
       prefermentInfo.water = round(prefermentWaterRaw);
       prefermentInfo.totalWeight = round(prefermentFlourRaw + prefermentWaterRaw);
-      prefermentInfo.percentage = blend.length
-        ? Math.round((prefermentFlourRaw / totalFlour) * 1000) / 10
-        : null;
+      prefermentInfo.percentage =
+        totalFlour > 0
+          ? Math.round((prefermentFlourRaw / totalFlour) * 1000) / 10
+          : null;
     }
 
     const flourBlendWithWeights = blend.map((item) => ({
       ...item,
-      weight: round(totalFlour * (item.percentage / 100)),
+      weight:
+        item.percentage !== null && item.percentage !== undefined
+          ? round(totalFlour * (item.percentage / 100))
+          : null,
     }));
 
     const yeastPct =
@@ -1933,6 +2201,11 @@
           ? 0
           : null
         : (yeastWeightRaw / totalFlour) * 100;
+
+    const desiredDoughWeight =
+      Number.isFinite(doughCount) && doughBallWeight !== null
+        ? doughCount * doughBallWeight
+        : null;
 
     const formula = {
       totalFlour: round(totalFlour),
@@ -1950,6 +2223,7 @@
         fat: roundOrNull(fatWeightRaw),
         sugar: roundOrNull(sugarWeightRaw),
         totalDoughWeight: round(totalDoughRaw),
+        targetDoughWeight: roundOrNull(desiredDoughWeight),
         mixFlour: round(mixFlourRaw),
         mixWater: round(mixWaterRaw),
         prefermentFlour: prefermentInfo
@@ -1964,6 +2238,12 @@
       },
       blend: flourBlendWithWeights,
     };
+    formula.meta = {
+      doughCount: Number.isFinite(doughCount) ? Math.round(doughCount) : null,
+      doughBallWeight: roundOrNull(doughBallWeight),
+      targetDoughWeight: roundOrNull(desiredDoughWeight),
+    };
+    formula.targetDoughWeight = roundOrNull(desiredDoughWeight);
 
     const recipe = {
       id: crypto.randomUUID(),
@@ -1972,9 +2252,11 @@
       styleCategory: styleChoice,
       fermentationMethod,
       fermentationTime,
+      fermentationTemperature,
       fermentation: {
         method: fermentationMethod,
         totalTime: fermentationTime,
+        temperature: fermentationTemperature,
         preferment: prefermentInfo,
       },
       flour: flourLabel,
@@ -1983,6 +2265,11 @@
       hydration: waterPct,
       formula,
       preferment: prefermentInfo,
+      formulation: {
+        doughCount: Number.isFinite(doughCount) ? Math.round(doughCount) : null,
+        doughBallWeight: roundOrNull(doughBallWeight),
+        targetDoughWeight: roundOrNull(desiredDoughWeight),
+      },
       photo: state.pendingPhoto ? { ...state.pendingPhoto } : null,
       notes,
       createdAt: timestamp,
@@ -2081,6 +2368,21 @@
       );
       handleRecipeFermentationChange();
     }
+    const autoFlourInputs = [
+      formulaDoughCountInput,
+      formulaDoughWeightInput,
+      formulaWaterInput,
+      formulaSaltInput,
+      formulaYeastInput,
+      formulaFatInput,
+      formulaSugarInput,
+    ];
+    autoFlourInputs.forEach((input) => {
+      if (input) {
+        input.addEventListener("input", calculateAutoFlour);
+      }
+    });
+    calculateAutoFlour();
     if (flourFiltersForm) {
       flourFiltersForm.addEventListener("change", handleFlourFiltersChange);
       flourFiltersForm.addEventListener("reset", handleFlourFiltersReset);

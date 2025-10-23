@@ -214,6 +214,47 @@ body.dark .form-section {
   color: var(--accent);
 }
 
+.field-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.formula-help {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  display: grid;
+  gap: 0.5rem;
+}
+
+body.dark .formula-help {
+  border-color: var(--border-dark);
+  background: rgba(32, 32, 40, 0.65);
+}
+
+.formula-help summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.formula-help ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  list-style: disc;
+}
+
+.formula-help__note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .flour-blend__remove {
   align-self: center;
   background: transparent;
@@ -704,6 +745,64 @@ body.dark .success-panel {
   line-height: 1.4;
 }
 
+.recipe-card__sections {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.recipe-card__section h4 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.recipe-card__blend,
+.recipe-card__formula {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-muted);
+}
+
+.recipe-card__actions {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.recipe-card__delete,
+.flour-card__delete {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.recipe-card__delete:hover,
+.flour-card__delete:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(228, 87, 46, 0.08);
+}
+
+body.dark .recipe-card__delete,
+body.dark .flour-card__delete {
+  color: var(--accent-dark);
+}
+
+.flour-card__actions {
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .success-panel__link {
   color: var(--accent);
   font-weight: 600;
@@ -916,13 +1015,21 @@ body.dark .flour-form {
     width: 100%;
   }
 
+  .recipe-card__actions,
+  .flour-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .flour-card__header {
     flex-direction: column;
     align-items: stretch;
   }
 
   .flour-card__edit,
-  .flour-form__close {
+  .flour-form__close,
+  .flour-card__delete,
+  .recipe-card__delete {
     width: 100%;
   }
 }
