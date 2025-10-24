@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Minhas Receitas de Pizza</title>
+    <title>MyPizzas</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header>
-      <h1>Minhas Receitas de Pizza</h1>
+      <h1>MyPizzas</h1>
       <p>Registre, avalie e consulte suas pizzas favoritas.</p>
     </header>
 
@@ -70,11 +70,19 @@
         </p>
 
         <form id="new-recipe-form" class="recipe-form" autocomplete="off">
+          <div class="field-status-legend" aria-hidden="true">
+            <span class="field-badge field-badge--required">Obrigatório</span>
+            <span class="field-badge field-badge--optional">Opcional</span>
+            <span class="field-badge field-badge--calculated">Calculado</span>
+          </div>
           <fieldset class="form-section">
             <legend>1. Objetivo da massa</legend>
-            <div class="field">
+            <div
+              class="field field-status"
+              data-field-status="optional"
+            >
               <label for="recipe-style">Qual estilo você quer atingir?</label>
-              <select id="recipe-style" name="recipeStyle" required>
+              <select id="recipe-style" name="recipeStyle">
                 <option value="">Selecione o estilo</option>
                 <option value="Napoletana">Napoletana</option>
                 <option value="Al taglio">Pizza al taglio</option>
@@ -84,7 +92,11 @@
                 <option value="Outro">Outro estilo</option>
               </select>
             </div>
-            <div class="field is-hidden" id="recipe-style-custom-group">
+            <div
+              class="field field-status is-hidden"
+              data-field-status="required"
+              id="recipe-style-custom-group"
+            >
               <label for="recipe-style-custom">Qual estilo?</label>
               <input
                 id="recipe-style-custom"
@@ -93,7 +105,10 @@
                 placeholder="Descreva o estilo desejado"
               />
             </div>
-            <div class="field">
+            <div
+              class="field field-status"
+              data-field-status="required"
+            >
               <label for="recipe-name">Nome da receita</label>
               <div class="input-affix has-prefix">
                 <span class="input-affix__prefix" aria-hidden="true">🍕</span>
@@ -133,7 +148,10 @@
 
           <fieldset class="form-section">
             <legend>3. Plano de fermentação</legend>
-            <div class="field">
+            <div
+              class="field field-status"
+              data-field-status="required"
+            >
               <label for="recipe-fermentation">Método</label>
               <select
                 id="recipe-fermentation"
@@ -148,7 +166,10 @@
                 <option value="Outros">Outro método</option>
               </select>
             </div>
-            <div class="field">
+            <div
+              class="field field-status"
+              data-field-status="required"
+            >
               <label for="recipe-fermentation-time"
                 >Tempo total de fermentação da massa</label
               >
@@ -161,15 +182,20 @@
                   step="0.5"
                   inputmode="decimal"
                   placeholder="Ex: 24"
+                  required
                 />
                 <span class="input-affix__suffix">horas</span>
               </div>
             </div>
-            <div class="field">
+            <div
+              class="field field-status"
+              data-field-status="required"
+            >
               <label for="recipe-fermentation-temp">Temperatura da fermentação</label>
               <select
                 id="recipe-fermentation-temp"
                 name="recipeFermentationTemperature"
+                required
               >
                 <option value="">Selecione</option>
                 <option value="TA">Temperatura ambiente (TA)</option>
@@ -183,7 +209,10 @@
                 Informe a inoculação (quanto da farinha total vai para o pré-fermento)
                 e a hidratação desejada.
               </p>
-              <div class="field">
+              <div
+                class="field field-status"
+                data-field-status="optional"
+              >
                 <label for="preferment-type">Tipo de pré-fermento</label>
                 <select id="preferment-type" name="prefermentType">
                   <option value="">Selecione</option>
@@ -194,7 +223,10 @@
                 </select>
               </div>
               <div class="field field-inline">
-                <div class="field">
+                <div
+                  class="field field-status"
+                  data-field-status="required"
+                >
                   <label for="preferment-inoculation">Inoculação</label>
                   <div class="input-affix has-suffix">
                     <input
@@ -210,7 +242,10 @@
                     <span class="input-affix__suffix">%</span>
                   </div>
                 </div>
-                <div class="field">
+                <div
+                  class="field field-status"
+                  data-field-status="required"
+                >
                   <label for="preferment-hydration">Hidratação</label>
                   <div class="input-affix has-suffix">
                     <input
@@ -227,7 +262,10 @@
                   </div>
                 </div>
               </div>
-              <div class="field">
+              <div
+                class="field field-status"
+                data-field-status="optional"
+              >
                 <label for="preferment-maturation">Maturação do pré-fermento</label>
                 <div class="input-affix has-suffix">
                   <input
@@ -251,110 +289,118 @@
               Defina os parâmetros principais da massa. A fórmula de padeiro será
               calculada automaticamente após o salvamento.
             </p>
-            <div class="field field-inline">
-              <div class="field">
-                <label for="formula-dough-count">Quantas massas você precisa?</label>
+            <div class="field field-status" data-field-status="required">
+              <label for="formula-dough-count">
+                Quantas massas você precisa?
+              </label>
+              <input
+                id="formula-dough-count"
+                name="formulaDoughCount"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="numeric"
+                placeholder="Ex: 4"
+                required
+              />
+            </div>
+            <div class="field field-status" data-field-status="required">
+              <label for="formula-dough-weight">
+                Peso alvo de cada massa
+              </label>
+              <div class="input-affix has-suffix">
                 <input
-                  id="formula-dough-count"
-                  name="formulaDoughCount"
+                  id="formula-dough-weight"
+                  name="formulaDoughWeight"
                   type="number"
-                  min="1"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder="Ex: 4"
+                  min="50"
+                  step="5"
+                  inputmode="decimal"
+                  value="260"
+                  required
                 />
+                <span class="input-affix__suffix">g</span>
               </div>
-              <div class="field">
-                <label for="formula-dough-weight">Peso alvo de cada massa</label>
-                <div class="input-affix has-suffix">
-                  <input
-                    id="formula-dough-weight"
-                    name="formulaDoughWeight"
-                    type="number"
-                    min="50"
-                    step="5"
-                    inputmode="decimal"
-                    value="260"
-                  />
-                  <span class="input-affix__suffix">g</span>
-                </div>
-                <span class="field-hint"
-                  >Usamos 260&nbsp;g como ponto de partida.</span
-                >
+              <span class="field-hint"
+                >Usamos 260&nbsp;g como ponto de partida.</span
+              >
+            </div>
+            <div class="field field-status" data-field-status="required">
+              <label for="formula-water">
+                Hidratação final desejada
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-water"
+                  name="formulaWaterPct"
+                  type="number"
+                  min="0"
+                  max="120"
+                  step="0.1"
+                  inputmode="decimal"
+                  placeholder="Ex: 65"
+                  required
+                />
+                <span class="input-affix__suffix">%</span>
               </div>
             </div>
-            <div class="field field-inline">
-              <div class="field">
-                <label for="formula-total-flour">Farinha total</label>
-                <div class="input-affix has-suffix">
-                  <input
-                    id="formula-total-flour"
-                    name="formulaTotalFlour"
-                    type="number"
-                    min="0"
-                    step="1"
-                    inputmode="decimal"
-                    placeholder="Ex: 1000"
-                    required
-                    readonly
-                  />
-                  <span class="input-affix__suffix">g</span>
-                </div>
-                <span class="field-hint"
-                  >Pré-calculado a partir das massas desejadas. Ajuste os parâmetros
-                  acima para mudar.</span
-                >
+            <div class="field field-status" data-field-status="calculated">
+              <label for="formula-total-flour">
+                Farinha total
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-total-flour"
+                  name="formulaTotalFlour"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="decimal"
+                  placeholder="Ex: 1000"
+                  required
+                  readonly
+                />
+                <span class="input-affix__suffix">g</span>
               </div>
-              <div class="field">
-                <label for="formula-water">Hidratação final desejada</label>
-                <div class="input-affix has-suffix">
-                  <input
-                    id="formula-water"
-                    name="formulaWaterPct"
-                    type="number"
-                    min="0"
-                    max="120"
-                    step="0.1"
-                    inputmode="decimal"
-                    placeholder="Ex: 65"
-                    required
-                  />
-                  <span class="input-affix__suffix">%</span>
-                </div>
-              </div>
+              <span class="field-hint"
+                >Pré-calculado a partir das massas desejadas. Ajuste os parâmetros
+                acima para mudar.</span
+              >
             </div>
-            <div class="field field-inline">
-              <div class="field">
-                <label for="formula-salt">Sal (%)</label>
-                <div class="input-affix has-suffix">
-                  <input
-                    id="formula-salt"
-                    name="formulaSaltPct"
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.05"
-                    inputmode="decimal"
-                    placeholder="Ex: 2.5"
-                  />
-                  <span class="input-affix__suffix">%</span>
-                </div>
-                <span class="field-hint">Percentual sobre a farinha total.</span>
+            <div class="field field-status" data-field-status="required">
+              <label for="formula-salt">
+                Sal (%)
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-salt"
+                  name="formulaSaltPct"
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.05"
+                  inputmode="decimal"
+                  placeholder="Ex: 2.5"
+                />
+                <span class="input-affix__suffix">%</span>
               </div>
-              <div class="field">
-                <label for="formula-yeast">Fermento (gramas)</label>
-                <div class="input-affix has-suffix">
-                  <input
-                    id="formula-yeast"
-                    name="formulaYeastGrams"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputmode="decimal"
-                    placeholder="Ex: 2"
-                  />
-                  <span class="input-affix__suffix">g</span>
-                </div>
+              <span class="field-hint">Percentual sobre a farinha total.</span>
+            </div>
+            <div class="field field-status" data-field-status="required">
+              <label for="formula-yeast">
+                Fermento (gramas)
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-yeast"
+                  name="formulaYeastGrams"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  placeholder="Ex: 2"
+                />
+                <span class="input-affix__suffix">g</span>
               </div>
             </div>
             <details class="formula-help">
@@ -382,45 +428,50 @@
                 maiores aceleram a fermentação.
               </p>
             </details>
-            <div class="field field-inline">
-              <div class="field">
-                <label for="formula-fat">Gordura (opcional)</label>
-                <div class="input-affix has-suffix">
-                  <input
-                    id="formula-fat"
-                    name="formulaFatPct"
-                    type="number"
-                    min="0"
-                    max="20"
-                    step="0.1"
-                    inputmode="decimal"
-                    placeholder="Ex: 3"
-                  />
-                  <span class="input-affix__suffix">%</span>
-                </div>
+            <div class="field field-status" data-field-status="optional">
+              <label for="formula-fat">
+                Gordura
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-fat"
+                  name="formulaFatPct"
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.1"
+                  inputmode="decimal"
+                  placeholder="Ex: 3"
+                />
+                <span class="input-affix__suffix">%</span>
               </div>
-              <div class="field">
-                <label for="formula-sugar">Açúcares (opcional)</label>
-                <div class="input-affix has-suffix">
-                  <input
-                    id="formula-sugar"
-                    name="formulaSugarPct"
-                    type="number"
-                    min="0"
-                    max="20"
-                    step="0.1"
-                    inputmode="decimal"
-                    placeholder="Ex: 2"
-                  />
-                  <span class="input-affix__suffix">%</span>
-                </div>
+            </div>
+            <div class="field field-status" data-field-status="optional">
+              <label for="formula-sugar">
+                Açúcares
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-sugar"
+                  name="formulaSugarPct"
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.1"
+                  inputmode="decimal"
+                  placeholder="Ex: 2"
+                />
+                <span class="input-affix__suffix">%</span>
               </div>
             </div>
           </fieldset>
 
           <fieldset class="form-section">
             <legend>5. Toques finais</legend>
-            <div class="field">
+            <div
+              class="field field-status"
+              data-field-status="optional"
+            >
               <label for="recipe-notes">Notas ou observações</label>
               <textarea
                 id="recipe-notes"
@@ -755,38 +806,66 @@
     <template id="recipe-card-template">
       <article class="recipe-card">
         <header class="recipe-card__header">
-          <h3 class="recipe-card__title"></h3>
-          <span class="recipe-card__meta"></span>
-        </header>
-        <div class="recipe-card__content">
-          <figure class="recipe-card__photo is-hidden">
-            <img src="" alt="Foto da pizza registrada" />
-          </figure>
-          <dl class="recipe-card__facts"></dl>
-          <p class="recipe-card__notes"></p>
-          <div class="recipe-card__sections">
-            <section class="recipe-card__section">
-              <h4>Blend de farinhas</h4>
-              <ul class="recipe-card__blend"></ul>
-            </section>
-            <section class="recipe-card__section">
-              <h4>Fórmula de padeiro</h4>
-              <ul class="recipe-card__formula"></ul>
-            </section>
+          <div>
+            <h3 class="recipe-card__title"></h3>
+            <p class="recipe-card__meta"></p>
           </div>
-        </div>
-        <footer class="recipe-card__footer">
           <strong class="recipe-card__average"></strong>
-          <div class="recipe-card__actions">
-            <button type="button" class="recipe-card__delete">Apagar receita</button>
-          </div>
-          <details>
-            <summary>Histórico de avaliações</summary>
-            <ul class="recipe-card__ratings"></ul>
-          </details>
+        </header>
+        <dl class="recipe-card__summary"></dl>
+        <footer class="recipe-card__footer">
+          <button type="button" class="recipe-card__details">Ver detalhes</button>
+          <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
         </footer>
       </article>
     </template>
+
+    <dialog id="recipe-detail-dialog">
+      <article class="recipe-detail">
+        <header class="recipe-detail__header">
+          <div>
+            <h3 class="recipe-detail__title"></h3>
+            <p class="recipe-detail__meta"></p>
+          </div>
+          <button type="button" class="recipe-detail__close" data-close-dialog>
+            Fechar
+          </button>
+        </header>
+        <div class="recipe-detail__body">
+          <figure class="recipe-card__photo is-hidden">
+            <img src="" alt="Foto da pizza registrada" />
+          </figure>
+          <section class="recipe-detail__section">
+            <h4>Resumo</h4>
+            <dl class="recipe-card__facts"></dl>
+          </section>
+          <section class="recipe-detail__section recipe-detail__section--notes is-hidden">
+            <h4>Notas</h4>
+            <p class="recipe-card__notes"></p>
+          </section>
+          <section class="recipe-detail__section">
+            <h4>Blend de farinhas</h4>
+            <ul class="recipe-card__blend"></ul>
+          </section>
+          <section class="recipe-detail__section">
+            <h4>Fórmula de padeiro</h4>
+            <ul class="recipe-card__formula"></ul>
+          </section>
+          <section class="recipe-detail__section">
+            <h4>Avaliações</h4>
+            <ul class="recipe-card__ratings"></ul>
+          </section>
+        </div>
+        <footer class="recipe-detail__footer">
+          <button type="button" class="recipe-detail__delete ghost">
+            Apagar receita
+          </button>
+          <button type="button" class="recipe-detail__close-secondary" data-close-dialog>
+            Fechar
+          </button>
+        </footer>
+      </article>
+    </dialog>
 
     <template id="flour-card-template">
       <article class="flour-card">
@@ -844,7 +923,10 @@
 
     <template id="flour-blend-row-template">
       <div class="flour-blend__row">
-        <div class="field">
+        <div
+          class="field field-status"
+          data-field-status="required"
+        >
           <select class="flour-blend__select" aria-label="Farinha do blend">
             <option value="">Selecione</option>
             <option value="custom">Informar manualmente</option>
@@ -856,7 +938,10 @@
             aria-label="Nome da farinha personalizada"
           />
         </div>
-        <div class="field">
+        <div
+          class="field field-status"
+          data-field-status="required"
+        >
           <div class="input-affix has-suffix">
             <input
               type="number"

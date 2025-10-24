@@ -37,6 +37,32 @@
   const successRecipeTemperature = document.querySelector(
     "#success-recipe-temperature"
   );
+  const recipeDetailDialog = document.querySelector("#recipe-detail-dialog");
+  const recipeDetailTitle =
+    recipeDetailDialog?.querySelector(".recipe-detail__title") ?? null;
+  const recipeDetailMeta =
+    recipeDetailDialog?.querySelector(".recipe-detail__meta") ?? null;
+  const recipeDetailPhoto =
+    recipeDetailDialog?.querySelector(".recipe-card__photo") ?? null;
+  const recipeDetailPhotoImage =
+    recipeDetailPhoto?.querySelector("img") ?? null;
+  const recipeDetailFacts =
+    recipeDetailDialog?.querySelector(".recipe-card__facts") ?? null;
+  const recipeDetailNotesSection =
+    recipeDetailDialog?.querySelector(".recipe-detail__section--notes") ?? null;
+  const recipeDetailNotes =
+    recipeDetailDialog?.querySelector(".recipe-card__notes") ?? null;
+  const recipeDetailBlendList =
+    recipeDetailDialog?.querySelector(".recipe-card__blend") ?? null;
+  const recipeDetailFormulaList =
+    recipeDetailDialog?.querySelector(".recipe-card__formula") ?? null;
+  const recipeDetailRatingsList =
+    recipeDetailDialog?.querySelector(".recipe-card__ratings") ?? null;
+  const recipeDetailDeleteButton =
+    recipeDetailDialog?.querySelector(".recipe-detail__delete") ?? null;
+  const recipeDetailCloseButtons = recipeDetailDialog
+    ? Array.from(recipeDetailDialog.querySelectorAll("[data-close-dialog]"))
+    : [];
   const recipeStyleSelect = document.querySelector("#recipe-style");
   const recipeStyleCustomGroup = document.querySelector(
     "#recipe-style-custom-group"
@@ -110,6 +136,8 @@
     editingFlourId: null,
     flourBlendCounter: 0,
   };
+
+  let activeRecipeDetail = null;
 
   const safeStorage = {
     load() {
@@ -831,9 +859,10 @@
   }
 
   function renderRecipeList(recipes) {
+    if (!recipeListContainer) return;
     recipeListContainer.innerHTML = "";
 
-    if (!recipes.length) {
+    if (!Array.isArray(recipes) || !recipes.length) {
       recipeListContainer.className = "recipes-empty";
       recipeListContainer.innerHTML =
         "<p>Nenhuma receita cadastrada ainda.</p>";
@@ -842,53 +871,72 @@
 
     recipeListContainer.className = "recipe-grid";
 
+    const templateRoot = recipeTemplate?.content?.firstElementChild ?? null;
+
     recipes
       .slice()
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .forEach((recipe) => {
-        const article = recipeTemplate.content
-          .firstElementChild.cloneNode(true);
+        const article = templateRoot
+          ? templateRoot.cloneNode(true)
+          : document.createElement("article");
 
-        article.querySelector(".recipe-card__title").textContent =
-          recipe.name || "Receita sem nome";
-        const createdLabel = recipe.createdAt
-          ? `Criada em ${formatDate(recipe.createdAt)}`
-          : "Criação não informada";
-        article.querySelector(".recipe-card__meta").textContent = createdLabel;
-
-        const details = getRecipeDetails(recipe);
-        const photoContainer = article.querySelector(".recipe-card__photo");
-        const photoImage = photoContainer?.querySelector("img") ?? null;
-
-        if (photoContainer) {
-          if (details.photo && details.photo.dataUrl) {
-            if (photoImage) {
-              photoImage.src = details.photo.dataUrl;
-              photoImage.alt = recipe.name
-                ? `Pizza ${recipe.name}`
-                : "Foto da pizza registrada";
-            }
-            photoContainer.classList.remove("is-hidden");
-          } else {
-            if (photoImage) {
-              photoImage.src = "";
-              photoImage.alt = "Foto da pizza registrada";
-            }
-            photoContainer.classList.add("is-hidden");
-          }
+        if (!templateRoot) {
+          article.className = "recipe-card";
+          article.innerHTML = `
+            <header class="recipe-card__header">
+              <div>
+                <h3 class="recipe-card__title"></h3>
+                <p class="recipe-card__meta"></p>
+              </div>
+              <strong class="recipe-card__average"></strong>
+            </header>
+            <dl class="recipe-card__summary"></dl>
+            <footer class="recipe-card__footer">
+              <button type="button" class="recipe-card__details">Ver detalhes</button>
+              <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
+            </footer>
+          `;
         }
 
-        const factsList = article.querySelector(".recipe-card__facts");
-        if (factsList) {
-          factsList.innerHTML = "";
-          const facts = [];
-          facts.push(["Estilo", details.style]);
-          facts.push(["Farinha", details.flourLabel || details.flour]);
-          facts.push(["Fermentação", details.fermentation]);
-          facts.push([
-            "Temperatura",
-            formatFermentationTemperature(details.fermentationTemperature),
-          ]);
+        const titleElement = article.querySelector(".recipe-card__title");
+        if (titleElement) {
+          titleElement.textContent = recipe.name || "Receita sem nome";
+        }
+
+        const metaElement = article.querySelector(".recipe-card__meta");
+        if (metaElement) {
+          const createdLabel = recipe.createdAt
+            ? `Criada em ${formatDate(recipe.createdAt)}`
+            : "Criação não informada";
+          metaElement.textContent = createdLabel;
+        }
+
+        const averageLabel = article.querySelector(".recipe-card__average");
+        if (averageLabel) {
+          const average = computeAverageScore(recipe.ratings);
+          averageLabel.textContent = average
+            ? `Nota média: ${average}`
+            : "Sem avaliações";
+        }
+
+        const details = getRecipeDetails(recipe);
+
+        const summaryElement = article.querySelector(".recipe-card__summary");
+        if (summaryElement) {
+          summaryElement.innerHTML = "";
+          const summaryItems = [];
+
+          summaryItems.push(["Estilo", details.style]);
+          summaryItems.push(["Farinha", details.flourLabel || details.flour]);
+          summaryItems.push(["Fermentação", details.fermentation]);
+
+          const timeLabel = formatHours(details.fermentationTime);
+          if (timeLabel) summaryItems.push(["Tempo total", timeLabel]);
+
+          const hydrationLabel = formatPercentage(details.hydration);
+          if (hydrationLabel) summaryItems.push(["Hidratação", hydrationLabel]);
+
           if (
             Number.isFinite(details.doughCount) &&
             parseNumeric(details.doughBallWeight) !== null
@@ -901,15 +949,12 @@
             const massesLabel = totalLabel
               ? `${countLabel} × ${ballWeightLabel} = ${totalLabel}`
               : `${countLabel} × ${ballWeightLabel}`;
-            facts.push(["Massas", massesLabel]);
+            summaryItems.push(["Massas", massesLabel]);
           }
-          facts.push(["Pré-fermento", details.prefermentLabel]);
-          facts.push(["Hidratação", formatPercentage(details.hydration)]);
-          facts.push(["Massa total", formatWeight(details.totalDoughWeight)]);
-          facts.push(["Tempo total", formatHours(details.fermentationTime)]);
 
-          facts
+          summaryItems
             .filter(([, value]) => Boolean(value))
+            .slice(0, 6)
             .forEach(([label, value]) => {
               const row = document.createElement("div");
               const term = document.createElement("dt");
@@ -917,71 +962,190 @@
               term.textContent = label;
               desc.textContent = value;
               row.append(term, desc);
-              factsList.appendChild(row);
+              summaryElement.appendChild(row);
             });
 
-          if (!factsList.children.length) {
+          if (!summaryElement.children.length) {
             const row = document.createElement("div");
             const term = document.createElement("dt");
             const desc = document.createElement("dd");
-            term.textContent = "Detalhes";
-            desc.textContent = "Nenhum detalhe registrado ainda.";
+            term.textContent = "Resumo";
+            desc.textContent = "Nenhum dado disponível.";
             row.append(term, desc);
-            factsList.appendChild(row);
+            summaryElement.appendChild(row);
           }
         }
 
-        const notesParagraph = article.querySelector(".recipe-card__notes");
-        if (notesParagraph) {
-          if (details.notes) {
-            notesParagraph.textContent = details.notes;
-            notesParagraph.classList.remove("is-hidden");
-          } else {
-            notesParagraph.textContent = "";
-            notesParagraph.classList.add("is-hidden");
-          }
+        const detailsButton = article.querySelector(".recipe-card__details");
+        if (detailsButton) {
+          detailsButton.addEventListener("click", () => openRecipeDetail(recipe));
         }
-
-        const averageLabel = article.querySelector(".recipe-card__average");
-        const average = computeAverageScore(recipe.ratings);
-        averageLabel.textContent = average
-          ? `Nota média: ${average} (${recipe.ratings.length} avaliação${
-              recipe.ratings.length > 1 ? "es" : ""
-            })`
-          : "Ainda sem avaliações";
-
-        const ratingsList = article.querySelector(".recipe-card__ratings");
-        if (recipe.ratings.length) {
-          recipe.ratings
-            .slice()
-            .sort((a, b) => new Date(b.date) - new Date(a.date))
-            .forEach((rating) => {
-              const item = document.createElement("li");
-              item.textContent = `${formatDate(rating.date)} — Nota ${
-                rating.score
-              }${rating.notes ? ` • ${rating.notes}` : ""}`;
-              ratingsList.appendChild(item);
-            });
-        } else {
-          const item = document.createElement("li");
-          item.textContent = "Sem avaliações registradas.";
-          ratingsList.appendChild(item);
-        }
-
-        const blendList = article.querySelector(".recipe-card__blend");
-        renderFlourBlendList(blendList, details.flourBlend);
-
-        const formulaList = article.querySelector(".recipe-card__formula");
-        renderFormulaList(formulaList, details);
 
         const deleteButton = article.querySelector(".recipe-card__delete");
         if (deleteButton) {
-          deleteButton.dataset.id = recipe.id;
           deleteButton.addEventListener("click", () => handleRecipeDelete(recipe));
         }
 
         recipeListContainer.appendChild(article);
       });
+  }
+
+  function openRecipeDetail(recipe) {
+    if (!recipe || !recipeDetailDialog) return;
+    if (recipeDetailDialog.open) {
+      recipeDetailDialog.close();
+    }
+    activeRecipeDetail = recipe;
+
+    const ratings = Array.isArray(recipe.ratings) ? recipe.ratings : [];
+    const details = getRecipeDetails(recipe);
+
+    if (recipeDetailTitle) {
+      recipeDetailTitle.textContent = recipe.name || "Receita sem nome";
+    }
+
+    if (recipeDetailMeta) {
+      const metaParts = [];
+      if (recipe.createdAt) {
+        metaParts.push(`Criada em ${formatDate(recipe.createdAt)}`);
+      }
+      if (details.style) {
+        metaParts.push(`Estilo ${details.style}`);
+      }
+      const average = computeAverageScore(ratings);
+      if (average) {
+        const count = ratings.length;
+        const suffix = count === 1 ? "avaliação" : "avaliações";
+        metaParts.push(`Nota média ${average} (${count} ${suffix})`);
+      }
+      recipeDetailMeta.textContent =
+        metaParts.join(" • ") || "Sem informações adicionais";
+    }
+
+    if (recipeDetailPhoto) {
+      if (details.photo && details.photo.dataUrl) {
+        if (recipeDetailPhotoImage) {
+          recipeDetailPhotoImage.src = details.photo.dataUrl;
+          recipeDetailPhotoImage.alt = recipe.name
+            ? `Pizza ${recipe.name}`
+            : "Foto da pizza registrada";
+        }
+        recipeDetailPhoto.classList.remove("is-hidden");
+      } else {
+        if (recipeDetailPhotoImage) {
+          recipeDetailPhotoImage.src = "";
+          recipeDetailPhotoImage.alt = "Foto da pizza registrada";
+        }
+        recipeDetailPhoto.classList.add("is-hidden");
+      }
+    }
+
+    if (recipeDetailFacts) {
+      recipeDetailFacts.innerHTML = "";
+      const facts = [];
+      facts.push(["Estilo", details.style]);
+      facts.push(["Farinha", details.flourLabel || details.flour]);
+      facts.push(["Fermentação", details.fermentation]);
+      facts.push([
+        "Temperatura",
+        formatFermentationTemperature(details.fermentationTemperature),
+      ]);
+      if (
+        Number.isFinite(details.doughCount) &&
+        parseNumeric(details.doughBallWeight) !== null
+      ) {
+        const countLabel = Math.round(details.doughCount);
+        const ballWeightLabel = formatWeight(details.doughBallWeight);
+        const totalLabel = formatWeight(
+          details.targetDoughWeight ?? details.totalDoughWeight
+        );
+        const massesLabel = totalLabel
+          ? `${countLabel} × ${ballWeightLabel} = ${totalLabel}`
+          : `${countLabel} × ${ballWeightLabel}`;
+        facts.push(["Massas", massesLabel]);
+      }
+      facts.push(["Pré-fermento", details.prefermentLabel]);
+      facts.push(["Hidratação", formatPercentage(details.hydration)]);
+      facts.push(["Massa total", formatWeight(details.totalDoughWeight)]);
+      facts.push(["Tempo total", formatHours(details.fermentationTime)]);
+
+      facts
+        .filter(([, value]) => Boolean(value))
+        .forEach(([label, value]) => {
+          const row = document.createElement("div");
+          const term = document.createElement("dt");
+          const desc = document.createElement("dd");
+          term.textContent = label;
+          desc.textContent = value;
+          row.append(term, desc);
+          recipeDetailFacts.appendChild(row);
+        });
+
+      if (!recipeDetailFacts.children.length) {
+        const row = document.createElement("div");
+        const term = document.createElement("dt");
+        const desc = document.createElement("dd");
+        term.textContent = "Resumo";
+        desc.textContent = "Nenhum detalhe registrado ainda.";
+        row.append(term, desc);
+        recipeDetailFacts.appendChild(row);
+      }
+    }
+
+    if (recipeDetailNotesSection && recipeDetailNotes) {
+      if (details.notes) {
+        recipeDetailNotes.textContent = details.notes;
+        recipeDetailNotesSection.classList.remove("is-hidden");
+      } else {
+        recipeDetailNotes.textContent = "";
+        recipeDetailNotesSection.classList.add("is-hidden");
+      }
+    }
+
+    renderFlourBlendList(recipeDetailBlendList, details.flourBlend);
+    renderFormulaList(recipeDetailFormulaList, details);
+
+    if (recipeDetailRatingsList) {
+      recipeDetailRatingsList.innerHTML = "";
+      if (ratings.length) {
+        ratings
+          .slice()
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .forEach((rating) => {
+            const item = document.createElement("li");
+            item.textContent = `${formatDate(rating.date)} — Nota ${
+              rating.score
+            }${rating.notes ? ` • ${rating.notes}` : ""}`;
+            recipeDetailRatingsList.appendChild(item);
+          });
+      } else {
+        const item = document.createElement("li");
+        item.textContent = "Sem avaliações registradas.";
+        recipeDetailRatingsList.appendChild(item);
+      }
+    }
+
+    if (recipeDetailDeleteButton) {
+      recipeDetailDeleteButton.onclick = () => handleRecipeDelete(recipe);
+    }
+
+    try {
+      recipeDetailDialog.showModal();
+    } catch (err) {
+      if (typeof recipeDetailDialog.show === "function") {
+        recipeDetailDialog.show();
+      } else {
+        console.warn("Dialog API não suportada:", err);
+      }
+    }
+  }
+
+  function closeRecipeDetail() {
+    if (!recipeDetailDialog) return;
+    if (recipeDetailDialog.open) {
+      recipeDetailDialog.close();
+    }
+    activeRecipeDetail = null;
   }
 
   function renderEvaluationOptions(recipes) {
@@ -1437,6 +1601,10 @@
     );
     if (!shouldRemove) return;
 
+    if (activeRecipeDetail && activeRecipeDetail.id === recipe.id) {
+      closeRecipeDetail();
+    }
+
     state.recipes = state.recipes.filter((item) => item.id !== recipe.id);
     safeStorage.save(state.recipes);
     syncUI();
@@ -1861,18 +2029,15 @@
     }
 
     const styleChoice = (formData.get("recipeStyle") || "").toString().trim();
-    if (!styleChoice) {
-      showFeedback("Selecione o estilo que deseja atingir.");
-      return;
-    }
-
-    let style = styleChoice;
+    let style = "";
     if (styleChoice === "Outro") {
       style = (formData.get("recipeStyleCustom") || "").toString().trim();
       if (!style) {
         showFeedback("Descreva o estilo desejado.");
         return;
       }
+    } else {
+      style = styleChoice;
     }
 
     const fermentationTemperature = (
@@ -1881,10 +2046,21 @@
       .toString()
       .trim();
 
+    if (!fermentationTemperature) {
+      showFeedback("Informe a temperatura da fermentação.");
+      return;
+    }
+
     const doughCount = parseNumeric(formData.get("formulaDoughCount"));
-    let doughBallWeight = parseNumeric(formData.get("formulaDoughWeight"));
+    if (doughCount === null || doughCount <= 0) {
+      showFeedback("Informe quantas massas você precisa (valor maior que zero).");
+      return;
+    }
+
+    const doughBallWeight = parseNumeric(formData.get("formulaDoughWeight"));
     if (doughBallWeight === null || doughBallWeight <= 0) {
-      doughBallWeight = 260;
+      showFeedback("Informe o peso alvo de cada massa (valor maior que zero).");
+      return;
     }
 
     const fermentationMethod = (
@@ -1903,8 +2079,10 @@
       .toString()
       .trim();
     const fermentationTime = parseNumeric(fermentationTimeInput);
-    if (fermentationTime !== null && fermentationTime < 0) {
-      showFeedback("O tempo total de fermentação deve ser positivo.");
+    if (fermentationTime === null || fermentationTime <= 0) {
+      showFeedback(
+        "Informe o tempo total de fermentação (valor maior que zero)."
+      );
       return;
     }
 
@@ -2397,6 +2575,16 @@
       flourFormCancel.addEventListener("click", (event) => {
         event.preventDefault();
         closeFlourForm();
+      });
+    }
+    if (recipeDetailCloseButtons.length) {
+      recipeDetailCloseButtons.forEach((button) => {
+        button.addEventListener("click", () => closeRecipeDetail());
+      });
+    }
+    if (recipeDetailDialog) {
+      recipeDetailDialog.addEventListener("close", () => {
+        activeRecipeDetail = null;
       });
     }
   }

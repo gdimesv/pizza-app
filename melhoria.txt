@@ -1,17 +1,2 @@
-Na parte do pré fermento:
-
-- tempo total de fermentação da massa
-- hidratação da biga
-- na parte de maturação do fermento deixa um box indicando se será temperatura controlada ou ambiente
-
-Na parte da formulação:
-
-- farinha total poderia ser pré calculado com base na quantidade de massas que o usuário definir, usando como base uma massa pré definida, ex: 260 gramas.
-- ajustar naming: hidração final desejada
-- deixar claro que o sal é em percentual, pois depois será calculado
-- fermento seria legal ter uma pequena calculadora também. ou um pop-up com algumas indicações de quanto fermento usar para cada temperatura. 
-
-- na parte de receitas registradas ele reduz consideravelmente o numero de informações em relação ou output da fórmula de padeiro apresentada na primeira tela de cadastrar receita. O ideal é que se mantenha o mesmo nível de detalhe pois um usuário fará mais de 1x a mesma receita então ele precisa acessar a fórmula do padeiro sempre que achar necessário. 
-
-- falta um botão de apagar receitas registradas
-- falta um botão para apagar farinhas registradas
+- Na formulação deixar as coisas uma embaixo da outra. Jornada sempre linear
+- Ainda não estou satisfeito com a parte do calculo de fermentação, preciso pensar em alternativas melhores. Talvez trazer a logica do yest calculator para cá. 
