@@ -2,9 +2,7 @@
   const storageKey = "pizzaApp.recipes";
   const flourStorageKey = "pizzaApp.flours";
   const newRecipeForm = document.querySelector("#new-recipe-form");
-  const evaluationForm = document.querySelector("#evaluation-form");
   const recipeListContainer = document.querySelector("#recipe-list");
-  const evaluationSelect = document.querySelector("#evaluation-recipe");
   const feedbackDialog = document.querySelector("#feedback-dialog");
   const feedbackMessage = document.querySelector("#feedback-message");
   const recipeTemplate = document.querySelector("#recipe-card-template");
@@ -58,6 +56,16 @@
     recipeDetailDialog?.querySelector(".recipe-card__formula") ?? null;
   const recipeDetailRatingsList =
     recipeDetailDialog?.querySelector(".recipe-card__ratings") ?? null;
+  const recipeDetailEvaluationForm =
+    recipeDetailDialog?.querySelector(".recipe-evaluation-form") ?? null;
+  const recipeDetailEvaluationRating =
+    recipeDetailEvaluationForm?.querySelector("#recipe-evaluation-rating") ??
+    null;
+  const recipeDetailEvaluationNotes =
+    recipeDetailEvaluationForm?.querySelector("#recipe-evaluation-notes") ??
+    null;
+  const recipeDetailEvaluationFeedback =
+    recipeDetailDialog?.querySelector("#recipe-evaluation-feedback") ?? null;
   const recipeDetailDeleteButton =
     recipeDetailDialog?.querySelector(".recipe-detail__delete") ?? null;
   const recipeDetailCloseButtons = recipeDetailDialog
@@ -81,6 +89,33 @@
   );
   const recipeFermentationSelect = document.querySelector(
     "#recipe-fermentation"
+  );
+  const recipeFermentationTimeInput = document.querySelector(
+    "#recipe-fermentation-time"
+  );
+  const recipeFermentationTempSelect = document.querySelector(
+    "#recipe-fermentation-temp"
+  );
+  const fermentationTemperatureFields = document.querySelector(
+    "#fermentation-temperature-fields"
+  );
+  const fermentationTempAmbientField = document.querySelector(
+    "#fermentation-temp-ambient-field"
+  );
+  const fermentationTempControlledField = document.querySelector(
+    "#fermentation-temp-controlled-field"
+  );
+  const fermentationTimeAmbientField = document.querySelector(
+    "#fermentation-time-ambient-field"
+  );
+  const recipeFermentationAmbientTempInput = document.querySelector(
+    "#recipe-fermentation-temp-ambient"
+  );
+  const recipeFermentationControlledTempInput = document.querySelector(
+    "#recipe-fermentation-temp-controlled"
+  );
+  const recipeFermentationAmbientDurationInput = document.querySelector(
+    "#recipe-fermentation-time-ambient"
   );
   const prefermentFields = document.querySelector("#preferment-fields");
   const prefermentTypeSelect = document.querySelector("#preferment-type");
@@ -107,6 +142,9 @@
   const formulaYeastInput = document.querySelector("#formula-yeast");
   const formulaFatInput = document.querySelector("#formula-fat");
   const formulaSugarInput = document.querySelector("#formula-sugar");
+  const formulaYeastAutoButton = document.querySelector("#formula-yeast-auto");
+  const formulaYeastFeedback = document.querySelector("#formula-yeast-feedback");
+  const formulaYeastWarning = document.querySelector("#formula-yeast-warning");
   const successFlourBlendList = document.querySelector("#success-flour-blend");
   const successFormulaList = document.querySelector("#success-formula");
   const flourListContainer = document.querySelector("#flour-list");
@@ -135,6 +173,7 @@
     },
     editingFlourId: null,
     flourBlendCounter: 0,
+    yeastSuggestion: null,
   };
 
   let activeRecipeDetail = null;
@@ -263,6 +302,30 @@
     maximumFractionDigits: 2,
   });
 
+  const DEFAULT_TEMPERATURES = {
+    TA: 24,
+    TC: 6,
+  };
+  const TEMPERATURE_SENSITIVITY = 6; // °C por dobra da atividade
+  const YEAST_BASE_TABLE = [
+    { min: 48, base: 0.045 },
+    { min: 36, base: 0.055 },
+    { min: 24, base: 0.08 },
+    { min: 18, base: 0.12 },
+    { min: 12, base: 0.2 },
+    { min: 6, base: 0.35 },
+    { min: 0, base: 0.5 },
+  ];
+  const METHOD_FACTORS = {
+    Direta: 1,
+    Biga: 0.6,
+    Poolish: 0.7,
+    Levain: 0.25,
+    Outros: 0.85,
+  };
+  const MIN_YEAST_PERCENTAGE = 0.01;
+  const MAX_YEAST_PERCENTAGE = 1;
+
   const weightFormatter = new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
@@ -299,6 +362,14 @@
     return null;
   }
 
+  function nearlyEqual(a, b, tolerance = 0.01) {
+    const numA = parseNumeric(a);
+    const numB = parseNumeric(b);
+    if (numA === null && numB === null) return true;
+    if (numA === null || numB === null) return false;
+    return Math.abs(numA - numB) <= tolerance;
+  }
+
   function formatPercentage(value) {
     const numeric = parseNumeric(value);
     if (numeric === null) return "";
@@ -312,14 +383,70 @@
     return `${decimalFormatter.format(numeric)} ${label}`;
   }
 
-  function formatFermentationTemperature(value) {
-    const labels = {
-      TA: "Temperatura ambiente (TA)",
-      TC: "Temperatura controlada (TC)",
-      Mista: "Mista (TA + TC)",
-    };
+  function formatTemperatureValue(value) {
+    const numeric = parseNumeric(value);
+    if (numeric === null) return null;
+    return `${decimalFormatter.format(numeric)}°C`;
+  }
+
+  function formatFermentationTemperature(
+    value,
+    details = null,
+    totalTime = null
+  ) {
     if (!value) return "";
-    return labels[value] || value;
+    const formatDurationShort = (hours) => {
+      const numeric = parseNumeric(hours);
+      if (numeric === null) return null;
+      return `${decimalFormatter.format(numeric)}h`;
+    };
+
+    if (value === "TC") {
+      const controlledLabel = formatTemperatureValue(details?.controlled);
+      if (controlledLabel) {
+        return `Temperatura controlada (TC) — ${controlledLabel}`;
+      }
+      return "Temperatura controlada (TC)";
+    }
+
+    if (value === "Mista") {
+      const ambientTempLabel = formatTemperatureValue(details?.ambient);
+      const controlledTempLabel = formatTemperatureValue(details?.controlled);
+      const ambientDurationLabel = formatDurationShort(
+        details?.ambientDuration
+      );
+      const controlledDurationLabel = formatDurationShort(
+        details?.controlledDuration ??
+          (totalTime !== null && ambientDurationLabel !== null
+            ? Math.max(totalTime - parseNumeric(details?.ambientDuration), 0)
+            : null)
+      );
+
+      const segments = [];
+      if (ambientTempLabel) {
+        const partDuration = ambientDurationLabel
+          ? ` ${ambientDurationLabel}`
+          : "";
+        segments.push(`TA${partDuration} @ ${ambientTempLabel}`);
+      }
+      if (controlledTempLabel) {
+        const partDuration = controlledDurationLabel
+          ? ` ${controlledDurationLabel}`
+          : "";
+        segments.push(`TC${partDuration} @ ${controlledTempLabel}`);
+      }
+
+      if (!segments.length) {
+        return "Temperatura mista (TA + TC)";
+      }
+      return `Temperatura mista (${segments.join(" + ")})`;
+    }
+
+    const ambientLabel = formatTemperatureValue(details?.ambient);
+    if (ambientLabel) {
+      return `Temperatura ambiente (TA) — ${ambientLabel}`;
+    }
+    return "Temperatura ambiente (TA)";
   }
 
   function formatDateOnly(isoString) {
@@ -628,6 +755,441 @@
     }
   }
 
+  function getYeastSuggestionContext() {
+    const method = recipeFermentationSelect?.value?.trim() ?? "";
+    const time = parseNumeric(recipeFermentationTimeInput?.value);
+    const temperatureType = recipeFermentationTempSelect?.value?.trim() ?? "";
+    const hydration = parseNumeric(formulaWaterInput?.value);
+    const ambientTemp = parseNumeric(
+      recipeFermentationAmbientTempInput?.value
+    );
+    const controlledTemp = parseNumeric(
+      recipeFermentationControlledTempInput?.value
+    );
+    const ambientDurationInput = parseNumeric(
+      recipeFermentationAmbientDurationInput?.value
+    );
+    const totalTime = parseNumeric(recipeFermentationTimeInput?.value);
+
+    let ambientDuration = ambientDurationInput;
+    let controlledDuration = null;
+
+    if (Number.isFinite(totalTime)) {
+      if (temperatureType === "Mista") {
+        if (
+          ambientDuration === null ||
+          ambientDuration <= 0 ||
+          ambientDuration >= totalTime
+        ) {
+          ambientDuration = null;
+        } else {
+          controlledDuration = Math.max(totalTime - ambientDuration, 0);
+        }
+      } else if (temperatureType === "TA") {
+        ambientDuration = totalTime;
+        controlledDuration = 0;
+      } else if (temperatureType === "TC") {
+        ambientDuration = 0;
+        controlledDuration = totalTime;
+      }
+    }
+
+    return {
+      method,
+      time,
+      totalTime,
+      temperature: temperatureType,
+      hydration,
+      ambientTemp,
+      controlledTemp,
+      ambientDuration,
+      controlledDuration,
+    };
+  }
+
+  function resolveDurations(context) {
+    const total =
+      parseNumeric(context.totalTime) ??
+      parseNumeric(context.time) ??
+      null;
+    let ambientDuration = parseNumeric(context.ambientDuration);
+    let controlledDuration = parseNumeric(context.controlledDuration);
+
+    if (context.temperature === "Mista") {
+      if (ambientDuration === null && total !== null) {
+        ambientDuration = total / 2;
+      }
+      if (controlledDuration === null && total !== null) {
+        controlledDuration = Math.max(total - ambientDuration, 0);
+      }
+    } else if (total !== null) {
+      if (context.temperature === "TA") {
+        ambientDuration = total;
+        controlledDuration = 0;
+      } else if (context.temperature === "TC") {
+        ambientDuration = 0;
+        controlledDuration = total;
+      }
+    }
+
+    const resolvedAmbient = ambientDuration ?? null;
+    const resolvedControlled =
+      controlledDuration ??
+      (total !== null && resolvedAmbient !== null
+        ? Math.max(total - resolvedAmbient, 0)
+        : null);
+    const resolvedTotal =
+      total ??
+      (resolvedAmbient ?? 0) +
+        (resolvedControlled ?? 0);
+
+    return {
+      ambientDuration: resolvedAmbient,
+      controlledDuration: resolvedControlled,
+      totalDuration: resolvedTotal,
+    };
+  }
+
+  function computeEffectiveTemperature(context) {
+    const { temperature } = context;
+    const { ambientDuration, controlledDuration, totalDuration } =
+      resolveDurations(context);
+    const ambient =
+      parseNumeric(context.ambientTemp) ?? DEFAULT_TEMPERATURES.TA;
+    const controlled =
+      parseNumeric(context.controlledTemp) ?? DEFAULT_TEMPERATURES.TC;
+
+    if (temperature === "TC") {
+      return controlled;
+    }
+    if (temperature === "Mista") {
+      const total = totalDuration ?? 0;
+      if (!total || total <= 0) {
+        return (ambient + controlled) / 2;
+      }
+      const ambientPortion = ambientDuration ?? total / 2;
+      const controlledPortion =
+        controlledDuration ?? Math.max(total - ambientPortion, 0);
+      if (ambientPortion + controlledPortion === 0) {
+        return (ambient + controlled) / 2;
+      }
+      return (
+        (ambient * ambientPortion + controlled * controlledPortion) /
+        (ambientPortion + controlledPortion)
+      );
+    }
+    return ambient;
+  }
+
+  function computeDefaultEffectiveTemperature(context) {
+    const { temperature } = context;
+    const { ambientDuration, controlledDuration, totalDuration } =
+      resolveDurations(context);
+    const ambient = DEFAULT_TEMPERATURES.TA;
+    const controlled = DEFAULT_TEMPERATURES.TC;
+
+    if (temperature === "TC") {
+      return controlled;
+    }
+    if (temperature === "Mista") {
+      const total = totalDuration ?? 0;
+      if (!total || total <= 0) {
+        return (ambient + controlled) / 2;
+      }
+      const ambientPortion = ambientDuration ?? total / 2;
+      const controlledPortion =
+        controlledDuration ?? Math.max(total - ambientPortion, 0);
+      if (ambientPortion + controlledPortion === 0) {
+        return (ambient + controlled) / 2;
+      }
+      return (
+        (ambient * ambientPortion + controlled * controlledPortion) /
+        (ambientPortion + controlledPortion)
+      );
+    }
+    return ambient;
+  }
+
+  function calculateYeastPercentage(context) {
+    const { method, time, temperature, hydration } = context;
+    if (!method || !temperature || time === null || time <= 0) {
+      return null;
+    }
+
+    const hours = Number(time);
+    const entry =
+      YEAST_BASE_TABLE.find((item) => hours >= item.min) ??
+      YEAST_BASE_TABLE[YEAST_BASE_TABLE.length - 1];
+    let percentage = entry.base;
+
+    const methodFactor = METHOD_FACTORS[method] ?? METHOD_FACTORS.Outros;
+    percentage *= methodFactor;
+
+    const defaultTemp = computeDefaultEffectiveTemperature(context);
+    const effectiveTemp = computeEffectiveTemperature(context);
+    if (
+      defaultTemp !== null &&
+      Number.isFinite(defaultTemp) &&
+      effectiveTemp !== null &&
+      Number.isFinite(effectiveTemp)
+    ) {
+      const delta = defaultTemp - effectiveTemp;
+      const temperatureFactor = Math.pow(
+        2,
+        delta / TEMPERATURE_SENSITIVITY
+      );
+      percentage *= temperatureFactor;
+    }
+
+    const hydrationValue = hydration ?? 0;
+    const hydrationAdjustment = Math.max(
+      -0.05,
+      Math.min((hydrationValue - 60) * 0.002, 0.05)
+    );
+    percentage = Math.max(
+      percentage + hydrationAdjustment,
+      MIN_YEAST_PERCENTAGE
+    );
+
+    return Math.min(percentage, MAX_YEAST_PERCENTAGE);
+  }
+
+  function formatYeastSuggestionMessage(context) {
+    const {
+      time,
+      temperature,
+      method,
+      hydration,
+      percentage,
+      grams,
+      ambientTemp,
+      controlledTemp,
+      ambientDuration,
+      controlledDuration,
+    } = context;
+    const timeLabel = formatHours(time) || "Tempo não informado";
+    const methodLabel = method || "Método indefinido";
+    const hydrationLabel =
+      hydration === null || hydration === undefined
+        ? ""
+        : `${decimalFormatter.format(hydration)}%`;
+
+    const temperatureLabel = formatFermentationTemperature(
+      temperature,
+      {
+        ambient: ambientTemp,
+        controlled: controlledTemp,
+        ambientDuration,
+        controlledDuration,
+      },
+      time
+    );
+
+    const headerParts = [timeLabel, methodLabel];
+    if (temperatureLabel) headerParts.push(temperatureLabel);
+    if (hydrationLabel) headerParts.push(`Hidratação ${hydrationLabel}`);
+    const header = headerParts.join(" • ");
+
+    const percentLabel = `${decimalFormatter.format(percentage)}%`;
+    const gramsLabel = formatWeight(grams);
+    const perKg = Math.max(0, Math.round((percentage / 100) * 1000 * 10) / 10);
+    const perKgLabel = `${smallDecimalFormatter.format(perKg)} g por kg`;
+
+    return `${header} ⇒ ${percentLabel} (${gramsLabel} total / ${perKgLabel})`;
+  }
+
+  function handleYeastAutoClick() {
+    calculateAutoFlour();
+    resetYeastSuggestion();
+    const context = getYeastSuggestionContext();
+    const totalFlour = parseNumeric(formulaTotalFlourInput?.value);
+
+    if (!context.method) {
+      showFeedback("Selecione o método de fermentação para sugerir o fermento.");
+      return;
+    }
+
+    if (!context.temperature) {
+      showFeedback("Informe a temperatura da fermentação para sugerir o fermento.");
+      return;
+    }
+
+    if (context.time === null || context.time <= 0) {
+      showFeedback("Informe o tempo total de fermentação (valor maior que zero).");
+      return;
+    }
+
+    if (context.hydration === null || context.hydration <= 0) {
+      showFeedback("Informe a hidratação final desejada para sugerir o fermento.");
+      return;
+    }
+
+    const ambientTempRaw = parseNumeric(
+      recipeFermentationAmbientTempInput?.value
+    );
+    const controlledTempRaw = parseNumeric(
+      recipeFermentationControlledTempInput?.value
+    );
+    const ambientDurationRaw = parseNumeric(
+      recipeFermentationAmbientDurationInput?.value
+    );
+
+    switch (context.temperature) {
+      case "TA": {
+        if (ambientTempRaw === null || !Number.isFinite(ambientTempRaw)) {
+          showFeedback("Informe a temperatura ambiente média (°C).");
+          return;
+        }
+        context.ambientTemp = ambientTempRaw;
+        context.controlledTemp = null;
+        context.ambientDuration = context.time;
+        context.controlledDuration = 0;
+        break;
+      }
+      case "TC": {
+        if (controlledTempRaw === null || !Number.isFinite(controlledTempRaw)) {
+          showFeedback("Informe a temperatura da geladeira (°C).");
+          return;
+        }
+        context.controlledTemp = controlledTempRaw;
+        context.ambientTemp =
+          ambientTempRaw === null || Number.isNaN(ambientTempRaw)
+            ? null
+            : ambientTempRaw;
+        context.ambientDuration = 0;
+        context.controlledDuration = context.time;
+        break;
+      }
+      case "Mista": {
+        if (ambientTempRaw === null || !Number.isFinite(ambientTempRaw)) {
+          showFeedback("Informe a temperatura ambiente média (°C).");
+          return;
+        }
+        if (controlledTempRaw === null || !Number.isFinite(controlledTempRaw)) {
+          showFeedback("Informe a temperatura da geladeira (°C).");
+          return;
+        }
+        if (
+          ambientDurationRaw === null ||
+          ambientDurationRaw <= 0 ||
+          ambientDurationRaw >= context.time
+        ) {
+          showFeedback(
+            "Informe o tempo em temperatura ambiente (maior que 0 e menor que o tempo total)."
+          );
+          return;
+        }
+        const controlledDuration = Math.max(
+          context.time - ambientDurationRaw,
+          0
+        );
+        if (controlledDuration <= 0) {
+          showFeedback(
+            "O tempo em temperatura controlada precisa ser maior que zero."
+          );
+          return;
+        }
+        context.ambientTemp = ambientTempRaw;
+        context.controlledTemp = controlledTempRaw;
+        context.ambientDuration = ambientDurationRaw;
+        context.controlledDuration = controlledDuration;
+        break;
+      }
+      default: {
+        showFeedback("Informe a temperatura da fermentação para sugerir o fermento.");
+        return;
+      }
+    }
+
+    if (totalFlour === null || totalFlour <= 0) {
+      showFeedback("A farinha total precisa ser calculada antes da sugestão.");
+      return;
+    }
+
+    const percentage = calculateYeastPercentage(context);
+    if (percentage === null) {
+      showFeedback("Não foi possível calcular a sugestão de fermento.");
+      return;
+    }
+
+    const grams = Math.max(0, Math.round(((percentage / 100) * totalFlour) * 10) / 10);
+    formulaYeastInput.value = String(grams);
+    calculateAutoFlour();
+
+    state.yeastSuggestion = {
+      ...context,
+      percentage,
+      grams,
+      flour: totalFlour,
+      isStale: false,
+    };
+
+    const message = formatYeastSuggestionMessage({
+      ...context,
+      percentage,
+      grams,
+    });
+
+    if (formulaYeastFeedback) {
+      formulaYeastFeedback.textContent = message;
+    }
+    if (formulaYeastWarning) {
+      formulaYeastWarning.classList.add("is-hidden");
+    }
+  }
+
+  function markYeastSuggestionStale() {
+    if (!state.yeastSuggestion) return;
+    const current = getYeastSuggestionContext();
+    const previous = state.yeastSuggestion;
+
+    if (
+      !current.method ||
+      !current.temperature ||
+      current.time === null ||
+      current.time <= 0 ||
+      current.hydration === null ||
+      current.hydration <= 0
+    ) {
+      if (formulaYeastWarning) {
+        formulaYeastWarning.classList.add("is-hidden");
+      }
+      state.yeastSuggestion.isStale = true;
+      return;
+    }
+
+    const contextsMatch =
+      current.method === previous.method &&
+      current.temperature === previous.temperature &&
+      nearlyEqual(current.time, previous.time) &&
+      nearlyEqual(current.hydration, previous.hydration) &&
+      nearlyEqual(current.ambientTemp, previous.ambientTemp) &&
+      nearlyEqual(current.controlledTemp, previous.controlledTemp) &&
+      nearlyEqual(current.ambientDuration, previous.ambientDuration) &&
+      nearlyEqual(current.controlledDuration, previous.controlledDuration);
+    if (contextsMatch) {
+      if (formulaYeastWarning) {
+        formulaYeastWarning.classList.add("is-hidden");
+      }
+      state.yeastSuggestion.isStale = false;
+    } else {
+      if (formulaYeastWarning) {
+        formulaYeastWarning.classList.remove("is-hidden");
+      }
+      state.yeastSuggestion.isStale = true;
+    }
+  }
+
+  function resetYeastSuggestion() {
+    state.yeastSuggestion = null;
+    if (formulaYeastFeedback) {
+      formulaYeastFeedback.textContent = "";
+    }
+    if (formulaYeastWarning) {
+      formulaYeastWarning.classList.add("is-hidden");
+    }
+  }
+
   function getRecipeDetails(recipe) {
     const fermentationDetails = recipe.fermentation && typeof recipe.fermentation === "object"
       ? recipe.fermentation
@@ -645,6 +1207,27 @@
       recipe.totalFermentationHours;
     const preferment =
       fermentationDetails.preferment ?? recipe.preferment ?? null;
+    const fermentationTemperature =
+      fermentationDetails.temperature ??
+      recipe.fermentationTemperature ??
+      recipe.temperature ??
+      "";
+    const fermentationTemperatureDetails =
+      fermentationDetails.temperatureDetails &&
+      typeof fermentationDetails.temperatureDetails === "object"
+        ? fermentationDetails.temperatureDetails
+        : recipe.fermentationTemperatureDetails &&
+          typeof recipe.fermentationTemperatureDetails === "object"
+        ? recipe.fermentationTemperatureDetails
+        : recipe.temperatureDetails &&
+          typeof recipe.temperatureDetails === "object"
+        ? recipe.temperatureDetails
+        : null;
+    const fermentationTemperatureLabel = formatFermentationTemperature(
+      fermentationTemperature,
+      fermentationTemperatureDetails,
+      fermentationTime
+    );
 
     const style =
       recipe.style ?? recipe.recipeStyle ?? recipe.targetStyle ?? "";
@@ -749,16 +1332,12 @@
 
     const prefermentLabel = formatPrefermentSummary(preferment);
 
-    const fermentationTemperature =
-      fermentationDetails.temperature ??
-      recipe.fermentationTemperature ??
-      recipe.temperature ??
-      "";
-
     return {
       style,
       fermentation,
       fermentationTemperature,
+      fermentationTemperatureLabel,
+      temperatureDetails: fermentationTemperatureDetails,
       flour: flourName,
       flourLabel,
       flourBlend,
@@ -828,10 +1407,8 @@
         details.fermentation || "—";
     }
     if (successRecipeTemperature) {
-      const temperatureLabel = formatFermentationTemperature(
-        details.fermentationTemperature
-      );
-      successRecipeTemperature.textContent = temperatureLabel || "—";
+      successRecipeTemperature.textContent =
+        details.fermentationTemperatureLabel || "—";
     }
     if (successRecipeHydration) {
       const hydrationLabel = formatPercentage(details.hydration);
@@ -893,6 +1470,7 @@
             </header>
             <dl class="recipe-card__summary"></dl>
             <footer class="recipe-card__footer">
+              <button type="button" class="recipe-card__evaluate">Avaliar</button>
               <button type="button" class="recipe-card__details">Ver detalhes</button>
               <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
             </footer>
@@ -976,6 +1554,13 @@
           }
         }
 
+        const evaluateButton = article.querySelector(".recipe-card__evaluate");
+        if (evaluateButton) {
+          evaluateButton.addEventListener("click", () =>
+            openRecipeDetail(recipe, { focusEvaluation: true })
+          );
+        }
+
         const detailsButton = article.querySelector(".recipe-card__details");
         if (detailsButton) {
           detailsButton.addEventListener("click", () => openRecipeDetail(recipe));
@@ -990,11 +1575,11 @@
       });
   }
 
-  function openRecipeDetail(recipe) {
+  function populateRecipeDetail(
+    recipe,
+    { preserveEvaluationMessage = false, keepEvaluationInputs = false } = {}
+  ) {
     if (!recipe || !recipeDetailDialog) return;
-    if (recipeDetailDialog.open) {
-      recipeDetailDialog.close();
-    }
     activeRecipeDetail = recipe;
 
     const ratings = Array.isArray(recipe.ratings) ? recipe.ratings : [];
@@ -1046,10 +1631,7 @@
       facts.push(["Estilo", details.style]);
       facts.push(["Farinha", details.flourLabel || details.flour]);
       facts.push(["Fermentação", details.fermentation]);
-      facts.push([
-        "Temperatura",
-        formatFermentationTemperature(details.fermentationTemperature),
-      ]);
+      facts.push(["Temperatura", details.fermentationTemperatureLabel]);
       if (
         Number.isFinite(details.doughCount) &&
         parseNumeric(details.doughBallWeight) !== null
@@ -1125,18 +1707,41 @@
       }
     }
 
+    if (recipeDetailEvaluationForm) {
+      recipeDetailEvaluationForm.dataset.recipeId = recipe.id;
+      if (!keepEvaluationInputs) {
+        if (recipeDetailEvaluationForm instanceof HTMLFormElement) {
+          recipeDetailEvaluationForm.reset();
+        }
+        if (recipeDetailEvaluationRating) recipeDetailEvaluationRating.value = "";
+        if (recipeDetailEvaluationNotes) recipeDetailEvaluationNotes.value = "";
+      }
+    }
+    if (!preserveEvaluationMessage && recipeDetailEvaluationFeedback) {
+      recipeDetailEvaluationFeedback.textContent = "";
+    }
+
     if (recipeDetailDeleteButton) {
       recipeDetailDeleteButton.onclick = () => handleRecipeDelete(recipe);
     }
+  }
 
-    try {
-      recipeDetailDialog.showModal();
-    } catch (err) {
-      if (typeof recipeDetailDialog.show === "function") {
-        recipeDetailDialog.show();
-      } else {
-        console.warn("Dialog API não suportada:", err);
+  function openRecipeDetail(recipe, { focusEvaluation = false } = {}) {
+    if (!recipe || !recipeDetailDialog) return;
+    populateRecipeDetail(recipe);
+    if (!recipeDetailDialog.open) {
+      try {
+        recipeDetailDialog.showModal();
+      } catch (err) {
+        if (typeof recipeDetailDialog.show === "function") {
+          recipeDetailDialog.show();
+        } else {
+          console.warn("Dialog API não suportada:", err);
+        }
       }
+    }
+    if (focusEvaluation && recipeDetailEvaluationRating) {
+      recipeDetailEvaluationRating.focus();
     }
   }
 
@@ -1148,25 +1753,19 @@
     activeRecipeDetail = null;
   }
 
-  function renderEvaluationOptions(recipes) {
-    const currentValue = evaluationSelect.value;
-    evaluationSelect.innerHTML = '<option value="">Selecione</option>';
-
-    recipes.forEach((recipe) => {
-      const option = document.createElement("option");
-      option.value = recipe.id;
-      option.textContent = recipe.name;
-      evaluationSelect.appendChild(option);
-    });
-
-    if (recipes.some((recipe) => recipe.id === currentValue)) {
-      evaluationSelect.value = currentValue;
-    }
-  }
-
   function syncUI() {
     renderRecipeList(state.recipes);
-    renderEvaluationOptions(state.recipes);
+    if (activeRecipeDetail) {
+      const latest = state.recipes.find(
+        (item) => item.id === activeRecipeDetail.id
+      );
+      if (latest) {
+        populateRecipeDetail(latest, {
+          preserveEvaluationMessage: true,
+          keepEvaluationInputs: true,
+        });
+      }
+    }
   }
 
   function isFlourFilterActive() {
@@ -1842,6 +2441,77 @@
     ) {
       prefermentTypeSelect.value = method;
     }
+    markYeastSuggestionStale();
+  }
+
+  function toggleFieldVisibility(wrapper, input, shouldShow, required = false) {
+    if (!wrapper) return;
+    wrapper.classList.toggle("is-hidden", !shouldShow);
+    wrapper.toggleAttribute("hidden", !shouldShow);
+    if (shouldShow) {
+      wrapper.removeAttribute("hidden");
+    }
+    if (input) {
+      input.required = Boolean(shouldShow && required);
+    }
+  }
+
+  function updateFermentationTemperatureFields() {
+    if (!recipeFermentationTempSelect) return;
+    const type = recipeFermentationTempSelect.value;
+    const showAmbient = type === "TA" || type === "Mista";
+    const showControlled = type === "TC" || type === "Mista";
+    const showAmbientDuration = type === "Mista";
+    const shouldShowGroup =
+      showAmbient || showControlled || showAmbientDuration;
+
+    if (fermentationTemperatureFields) {
+      fermentationTemperatureFields.classList.toggle(
+        "is-hidden",
+        !shouldShowGroup
+      );
+      fermentationTemperatureFields.toggleAttribute(
+        "hidden",
+        !shouldShowGroup
+      );
+      if (shouldShowGroup) {
+        fermentationTemperatureFields.removeAttribute("hidden");
+      }
+    }
+
+    toggleFieldVisibility(
+      fermentationTempAmbientField,
+      recipeFermentationAmbientTempInput,
+      showAmbient,
+      true
+    );
+    toggleFieldVisibility(
+      fermentationTempControlledField,
+      recipeFermentationControlledTempInput,
+      showControlled,
+      true
+    );
+    toggleFieldVisibility(
+      fermentationTimeAmbientField,
+      recipeFermentationAmbientDurationInput,
+      showAmbientDuration,
+      true
+    );
+
+    if (!showAmbient && recipeFermentationAmbientTempInput) {
+      recipeFermentationAmbientTempInput.value = "";
+    }
+    if (!showControlled && recipeFermentationControlledTempInput) {
+      recipeFermentationControlledTempInput.value = "";
+    }
+    if (!showAmbientDuration && recipeFermentationAmbientDurationInput) {
+      recipeFermentationAmbientDurationInput.value = "";
+    }
+  }
+
+  function handleFermentationTemperatureChange() {
+    updateFermentationTemperatureFields();
+    markYeastSuggestionStale();
   }
 
   function handlePhotoChange(event) {
@@ -1914,9 +2584,11 @@
         delete formulaTotalFlourInput.dataset.autoValue;
       }
       calculateAutoFlour();
+      resetYeastSuggestion();
       if (recipeFermentationSelect) {
         togglePrefermentSection(recipeFermentationSelect.value);
       }
+      updateFermentationTemperatureFields();
       if (!shouldSkip) {
         hideSuccessSummary();
       }
@@ -2084,6 +2756,91 @@
         "Informe o tempo total de fermentação (valor maior que zero)."
       );
       return;
+    }
+
+    const ambientTempInput = parseNumeric(
+      formData.get("recipeFermentationTempAmbient")
+    );
+    const controlledTempInput = parseNumeric(
+      formData.get("recipeFermentationTempControlled")
+    );
+    const ambientPhaseTimeInput = parseNumeric(
+      formData.get("recipeFermentationTimeAmbient")
+    );
+
+    const temperatureDetails = {
+      type: fermentationTemperature,
+      ambient: null,
+      controlled: null,
+      ambientDuration: null,
+      controlledDuration: null,
+    };
+
+    switch (fermentationTemperature) {
+      case "TA": {
+        if (ambientTempInput === null || !Number.isFinite(ambientTempInput)) {
+          showFeedback("Informe a temperatura ambiente média (°C).");
+          return;
+        }
+        temperatureDetails.ambient = ambientTempInput;
+        temperatureDetails.ambientDuration = fermentationTime;
+        temperatureDetails.controlledDuration = 0;
+        break;
+      }
+      case "TC": {
+        if (
+          controlledTempInput === null ||
+          !Number.isFinite(controlledTempInput)
+        ) {
+          showFeedback("Informe a temperatura da geladeira (°C).");
+          return;
+        }
+        temperatureDetails.ambient = ambientTempInput;
+        temperatureDetails.controlled = controlledTempInput;
+        temperatureDetails.ambientDuration = 0;
+        temperatureDetails.controlledDuration = fermentationTime;
+        break;
+      }
+      case "Mista": {
+        if (ambientTempInput === null || !Number.isFinite(ambientTempInput)) {
+          showFeedback("Informe a temperatura ambiente média (°C).");
+          return;
+        }
+        if (
+          controlledTempInput === null ||
+          !Number.isFinite(controlledTempInput)
+        ) {
+          showFeedback("Informe a temperatura da geladeira (°C).");
+          return;
+        }
+        if (
+          ambientPhaseTimeInput === null ||
+          ambientPhaseTimeInput <= 0 ||
+          ambientPhaseTimeInput >= fermentationTime
+        ) {
+          showFeedback(
+            "Informe o tempo em temperatura ambiente (maior que 0 e menor que o tempo total)."
+          );
+          return;
+        }
+        const controlledPhaseDuration = Math.max(
+          fermentationTime - ambientPhaseTimeInput,
+          0
+        );
+        if (controlledPhaseDuration <= 0) {
+          showFeedback(
+            "O tempo em temperatura controlada precisa ser maior que zero."
+          );
+          return;
+        }
+        temperatureDetails.ambient = ambientTempInput;
+        temperatureDetails.controlled = controlledTempInput;
+        temperatureDetails.ambientDuration = ambientPhaseTimeInput;
+        temperatureDetails.controlledDuration = controlledPhaseDuration;
+        break;
+      }
+      default:
+        break;
     }
 
     const blendRows = flourBlendList
@@ -2464,39 +3221,73 @@
     state.skipResetEffects = false;
   }
 
-  function handleEvaluationSubmit(event) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const recipeId = formData.get("evaluationRecipe");
-    const ratingValue = Number(formData.get("evaluationRating"));
-    const notes = formData.get("evaluationNotes").trim();
+  function setRecipeEvaluationFeedback(message, variant = "info") {
+    if (!recipeDetailEvaluationFeedback) return;
+    recipeDetailEvaluationFeedback.textContent = message;
+    recipeDetailEvaluationFeedback.classList.toggle(
+      "is-error",
+      variant === "error"
+    );
+  }
 
+  function submitRecipeEvaluation(recipeId, ratingValue, notes) {
     if (!recipeId) {
-      showFeedback("Escolha uma receita para registrar a avaliação.");
-      return;
+      setRecipeEvaluationFeedback(
+        "Selecione uma receita para registrar a avaliação.",
+        "error"
+      );
+      return null;
     }
 
-    if (Number.isNaN(ratingValue) || ratingValue < 0 || ratingValue > 10) {
-      showFeedback("Informe uma nota válida entre 0 e 10.");
-      return;
+    const numericRating = parseNumeric(ratingValue);
+    if (numericRating === null || numericRating < 0 || numericRating > 10) {
+      setRecipeEvaluationFeedback(
+        "Informe uma nota válida entre 0 e 10.",
+        "error"
+      );
+      return null;
     }
 
     const recipe = state.recipes.find((item) => item.id === recipeId);
     if (!recipe) {
-      showFeedback("Receita não encontrada. Atualize a página e tente novamente.");
-      return;
+      setRecipeEvaluationFeedback(
+        "Receita não encontrada. Atualize a página e tente novamente.",
+        "error"
+      );
+      return null;
     }
 
+    const sanitizedNotes = (notes || "").toString().trim();
+    const normalizedRating = Math.round(numericRating * 2) / 2;
+
     recipe.ratings.push({
-      score: ratingValue,
-      notes,
+      score: normalizedRating,
+      notes: sanitizedNotes,
       date: new Date().toISOString(),
     });
 
     safeStorage.save(state.recipes);
+    return recipe;
+  }
+
+  function handleRecipeEvaluationSubmit(event) {
+    event.preventDefault();
+    if (!recipeDetailEvaluationForm) return;
+    const recipeId = recipeDetailEvaluationForm.dataset.recipeId || "";
+    const ratingValue = recipeDetailEvaluationRating?.value ?? "";
+    const notesValue = recipeDetailEvaluationNotes?.value ?? "";
+
+    const recipe = submitRecipeEvaluation(recipeId, ratingValue, notesValue);
+    if (!recipe) return;
+
+    recipeDetailEvaluationForm.reset();
     syncUI();
-    event.currentTarget.reset();
-    showFeedback(`Avaliação registrada para "${recipe.name}".`);
+    setRecipeEvaluationFeedback(
+      `Avaliação registrada para "${recipe.name}".`
+    );
+    if (recipeDetailEvaluationRating) {
+      recipeDetailEvaluationRating.focus();
+    }
   }
 
   function init() {
@@ -2512,7 +3303,6 @@
 
     newRecipeForm.addEventListener("submit", handleNewRecipeSubmit);
     newRecipeForm.addEventListener("reset", handleNewRecipeReset);
-    evaluationForm.addEventListener("submit", handleEvaluationSubmit);
     if (recipePhotoInput) {
       recipePhotoInput.addEventListener("change", handlePhotoChange);
     }
@@ -2546,6 +3336,21 @@
       );
       handleRecipeFermentationChange();
     }
+    if (recipeFermentationTempSelect) {
+      recipeFermentationTempSelect.addEventListener(
+        "change",
+        handleFermentationTemperatureChange
+      );
+      updateFermentationTemperatureFields();
+    } else {
+      updateFermentationTemperatureFields();
+    }
+    if (recipeFermentationTimeInput) {
+      recipeFermentationTimeInput.addEventListener(
+        "input",
+        markYeastSuggestionStale
+      );
+    }
     const autoFlourInputs = [
       formulaDoughCountInput,
       formulaDoughWeightInput,
@@ -2557,10 +3362,35 @@
     ];
     autoFlourInputs.forEach((input) => {
       if (input) {
-        input.addEventListener("input", calculateAutoFlour);
+        input.addEventListener("input", () => {
+          calculateAutoFlour();
+          if (input === formulaYeastInput) {
+            resetYeastSuggestion();
+          } else {
+            markYeastSuggestionStale();
+          }
+        });
       }
     });
     calculateAutoFlour();
+    if (formulaYeastAutoButton) {
+      formulaYeastAutoButton.addEventListener("click", handleYeastAutoClick);
+    }
+    [
+      recipeFermentationAmbientTempInput,
+      recipeFermentationControlledTempInput,
+      recipeFermentationAmbientDurationInput,
+    ].forEach((input) => {
+      if (input) {
+        input.addEventListener("input", markYeastSuggestionStale);
+      }
+    });
+    if (recipeDetailEvaluationForm) {
+      recipeDetailEvaluationForm.addEventListener(
+        "submit",
+        handleRecipeEvaluationSubmit
+      );
+    }
     if (flourFiltersForm) {
       flourFiltersForm.addEventListener("change", handleFlourFiltersChange);
       flourFiltersForm.addEventListener("reset", handleFlourFiltersReset);

@@ -473,6 +473,27 @@ body.dark .field-status[data-field-status="optional"] {
   border-left-color: #2643e9;
 }
 
+.formula-yeast-auto {
+  margin-top: 0.6rem;
+  align-self: flex-start;
+}
+
+.formula-yeast-feedback {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.formula-yeast-warning {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+body.dark .formula-yeast-warning {
+  color: var(--accent-dark);
+}
+
 .field-inline {
   display: grid;
   gap: 1rem;
@@ -699,6 +720,27 @@ body.dark .recipe-card__details {
   color: var(--accent-dark);
 }
 
+.recipe-card__evaluate {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.recipe-card__evaluate:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(228, 87, 46, 0.22);
+}
+
+body.dark .recipe-card__evaluate {
+  background: var(--accent-dark);
+  color: #fff;
+}
+
 .recipe-card__delete {
   border-radius: 999px;
   padding: 0.4rem 1rem;
@@ -857,6 +899,36 @@ body.dark .recipe-card__photo {
 
 .recipe-card__ratings li {
   line-height: 1.4;
+}
+
+.recipe-evaluation-form__actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.recipe-evaluation-form__actions button {
+  padding: 0.45rem 1.1rem;
+}
+
+.recipe-evaluation-feedback {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  min-height: 1em;
+}
+
+body.dark .recipe-evaluation-feedback {
+  color: #d5d4d3;
+}
+
+.recipe-evaluation-feedback.is-error {
+  color: var(--accent);
+}
+
+body.dark .recipe-evaluation-feedback.is-error {
+  color: var(--accent-dark);
 }
 
 .file-field {

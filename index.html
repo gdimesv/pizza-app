@@ -25,16 +25,6 @@
           Cadastrar receita
         </button>
         <button
-          id="tab-evaluate"
-          class="tab-button"
-          role="tab"
-          aria-selected="false"
-          aria-controls="panel-evaluate"
-          data-tab="evaluate"
-        >
-          Avaliar receita
-        </button>
-        <button
           id="tab-list"
           class="tab-button"
           role="tab"
@@ -147,7 +137,11 @@
           </fieldset>
 
           <fieldset class="form-section">
-            <legend>3. Plano de fermentação</legend>
+            <legend>3. Fermentação e Formulação</legend>
+            <p class="form-section__hint">
+              Defina estratégia, pré-fermento e parâmetros principais da massa.
+              A fórmula de padeiro será atualizada automaticamente.
+            </p>
             <div
               class="field field-status"
               data-field-status="required"
@@ -203,6 +197,81 @@
                 <option value="Mista">Mista (TA + TC)</option>
               </select>
             </div>
+            <section
+              id="fermentation-temperature-fields"
+              class="form-subsection"
+            >
+              <h4>Temperaturas de referência</h4>
+              <p class="form-subsection__hint">
+                Informe as temperaturas reais usadas na fermentação para
+                melhorar o cálculo do fermento.
+              </p>
+              <div
+                id="fermentation-temp-ambient-field"
+                class="field field-status is-hidden"
+                data-field-status="required"
+              >
+                <label for="recipe-fermentation-temp-ambient">Temperatura ambiente média</label>
+                <div class="input-affix has-suffix">
+                  <input
+                    id="recipe-fermentation-temp-ambient"
+                    name="recipeFermentationTempAmbient"
+                    type="number"
+                    step="0.1"
+                    inputmode="decimal"
+                    min="-5"
+                    max="50"
+                    placeholder="Ex: 24"
+                  />
+                  <span class="input-affix__suffix">°C</span>
+                </div>
+              </div>
+              <div
+                id="fermentation-temp-controlled-field"
+                class="field field-status is-hidden"
+                data-field-status="required"
+              >
+                <label for="recipe-fermentation-temp-controlled">Temperatura da geladeira</label>
+                <div class="input-affix has-suffix">
+                  <input
+                    id="recipe-fermentation-temp-controlled"
+                    name="recipeFermentationTempControlled"
+                    type="number"
+                    step="0.1"
+                    inputmode="decimal"
+                    min="-5"
+                    max="25"
+                    placeholder="Ex: 6"
+                  />
+                  <span class="input-affix__suffix">°C</span>
+                </div>
+              </div>
+              <div
+                id="fermentation-time-ambient-field"
+                class="field field-status is-hidden"
+                data-field-status="required"
+              >
+                <label for="recipe-fermentation-time-ambient"
+                  >Tempo em temperatura ambiente</label
+                >
+                <div class="input-affix has-suffix">
+                  <input
+                    id="recipe-fermentation-time-ambient"
+                    name="recipeFermentationTimeAmbient"
+                    type="number"
+                    step="0.5"
+                    inputmode="decimal"
+                    min="0"
+                    placeholder="Ex: 6"
+                  />
+                  <span class="input-affix__suffix">horas</span>
+                </div>
+                <span class="field-hint"
+                  >O restante do tempo será considerado em temperatura
+                  controlada.</span
+                >
+              </div>
+            </section>
             <section id="preferment-fields" class="form-subsection is-hidden">
               <h4>Pré-fermento</h4>
               <p class="form-subsection__hint">
@@ -281,14 +350,7 @@
                 </div>
               </div>
             </section>
-          </fieldset>
 
-          <fieldset class="form-section">
-            <legend>4. Formulação</legend>
-            <p class="form-section__hint">
-              Defina os parâmetros principais da massa. A fórmula de padeiro será
-              calculada automaticamente após o salvamento.
-            </p>
             <div class="field field-status" data-field-status="required">
               <label for="formula-dough-count">
                 Quantas massas você precisa?
@@ -344,29 +406,6 @@
                 <span class="input-affix__suffix">%</span>
               </div>
             </div>
-            <div class="field field-status" data-field-status="calculated">
-              <label for="formula-total-flour">
-                Farinha total
-              </label>
-              <div class="input-affix has-suffix">
-                <input
-                  id="formula-total-flour"
-                  name="formulaTotalFlour"
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputmode="decimal"
-                  placeholder="Ex: 1000"
-                  required
-                  readonly
-                />
-                <span class="input-affix__suffix">g</span>
-              </div>
-              <span class="field-hint"
-                >Pré-calculado a partir das massas desejadas. Ajuste os parâmetros
-                acima para mudar.</span
-              >
-            </div>
             <div class="field field-status" data-field-status="required">
               <label for="formula-salt">
                 Sal (%)
@@ -386,48 +425,6 @@
               </div>
               <span class="field-hint">Percentual sobre a farinha total.</span>
             </div>
-            <div class="field field-status" data-field-status="required">
-              <label for="formula-yeast">
-                Fermento (gramas)
-              </label>
-              <div class="input-affix has-suffix">
-                <input
-                  id="formula-yeast"
-                  name="formulaYeastGrams"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  inputmode="decimal"
-                  placeholder="Ex: 2"
-                />
-                <span class="input-affix__suffix">g</span>
-              </div>
-            </div>
-            <details class="formula-help">
-              <summary>Sugestões de fermento por temperatura</summary>
-              <ul>
-                <li>
-                  <strong>TA 20&nbsp;°C a 24&nbsp;°C:</strong> 0,1% a 0,2% da farinha
-                  para fermentações longas (&gt;18h)
-                </li>
-                <li>
-                  <strong>TA 24&nbsp;°C a 28&nbsp;°C:</strong> 0,2% a 0,4% para 12h a
-                  18h
-                </li>
-                <li>
-                  <strong>Controlada &lt; 6&nbsp;°C:</strong> 0,05% a 0,1% com maturação
-                  lenta (24h+)
-                </li>
-                <li>
-                  <strong>Mista (TA + TC):</strong> 0,15% a 0,25% dependendo do tempo em
-                  cada etapa
-                </li>
-              </ul>
-              <p class="formula-help__note">
-                Ajuste conforme a força da farinha e a rotina da produção. Valores
-                maiores aceleram a fermentação.
-              </p>
-            </details>
             <div class="field field-status" data-field-status="optional">
               <label for="formula-fat">
                 Gordura
@@ -464,10 +461,96 @@
                 <span class="input-affix__suffix">%</span>
               </div>
             </div>
+            <div class="field field-status" data-field-status="required">
+              <label for="formula-yeast">
+                Fermento (gramas)
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-yeast"
+                  name="formulaYeastGrams"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  placeholder="Ex: 2"
+                />
+                <span class="input-affix__suffix">g</span>
+              </div>
+              <button
+                type="button"
+                id="formula-yeast-auto"
+                class="ghost formula-yeast-auto"
+                aria-describedby="formula-yeast-feedback"
+              >
+                Calcular fermento ideal
+              </button>
+              <p
+                id="formula-yeast-feedback"
+                class="formula-yeast-feedback"
+                role="status"
+                aria-live="polite"
+              ></p>
+              <p
+                id="formula-yeast-warning"
+                class="formula-yeast-warning is-hidden"
+                aria-live="polite"
+              >
+                Sugestão desatualizada — recalcular.
+              </p>
+            </div>
+            <div class="field field-status" data-field-status="calculated">
+              <label for="formula-total-flour">
+                Farinha total
+              </label>
+              <div class="input-affix has-suffix">
+                <input
+                  id="formula-total-flour"
+                  name="formulaTotalFlour"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="decimal"
+                  placeholder="Ex: 1000"
+                  required
+                  readonly
+                />
+                <span class="input-affix__suffix">g</span>
+              </div>
+              <span class="field-hint"
+                >Pré-calculado a partir das massas desejadas. Ajuste os parâmetros
+                acima para mudar.</span
+              >
+            </div>
+            <details class="formula-help">
+              <summary>Sugestões de fermento por temperatura</summary>
+              <ul>
+                <li>
+                  <strong>TA 20&nbsp;°C a 24&nbsp;°C:</strong> 0,1% a 0,2% da farinha
+                  para fermentações longas (&gt;18h)
+                </li>
+                <li>
+                  <strong>TA 24&nbsp;°C a 28&nbsp;°C:</strong> 0,2% a 0,4% para 12h a
+                  18h
+                </li>
+                <li>
+                  <strong>Controlada &lt; 6&nbsp;°C:</strong> 0,05% a 0,1% com maturação
+                  lenta (24h+)
+                </li>
+                <li>
+                  <strong>Mista (TA + TC):</strong> 0,15% a 0,25% dependendo do tempo em
+                  cada etapa
+                </li>
+              </ul>
+              <p class="formula-help__note">
+                Ajuste conforme a força da farinha e a rotina da produção. Valores
+                maiores aceleram a fermentação.
+              </p>
+            </details>
           </fieldset>
 
           <fieldset class="form-section">
-            <legend>5. Toques finais</legend>
+            <legend>4. Toques finais</legend>
             <div
               class="field field-status"
               data-field-status="optional"
@@ -558,53 +641,6 @@
       </section>
 
       <section
-        id="panel-evaluate"
-        class="card tab-panel is-hidden"
-        role="tabpanel"
-        aria-labelledby="tab-evaluate"
-        data-panel="evaluate"
-        hidden
-      >
-        <h2>2. Avaliar receita já feita</h2>
-        <form id="evaluation-form">
-          <div class="field">
-            <label for="evaluation-recipe">Escolha a receita</label>
-            <select id="evaluation-recipe" name="evaluationRecipe" required>
-              <option value="">Selecione</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="evaluation-rating">Nota (0-10)</label>
-            <input
-              id="evaluation-rating"
-              name="evaluationRating"
-              type="number"
-              min="0"
-              max="10"
-              step="0.5"
-              required
-            />
-          </div>
-
-          <div class="field">
-            <label for="evaluation-notes">Comentários</label>
-            <textarea
-              id="evaluation-notes"
-              name="evaluationNotes"
-              rows="3"
-              placeholder="O que deu certo? O que pode melhorar?"
-            ></textarea>
-          </div>
-
-          <div class="actions">
-            <button type="reset" class="ghost">Limpar</button>
-            <button type="submit">Registrar avaliação</button>
-          </div>
-        </form>
-      </section>
-
-      <section
         id="panel-list"
         class="card tab-panel is-hidden"
         role="tabpanel"
@@ -612,7 +648,7 @@
         data-panel="list"
         hidden
       >
-        <h2>3. Receitas registradas</h2>
+        <h2>2. Receitas registradas</h2>
         <div id="recipe-list" class="recipes-empty">
           <p>Nenhuma receita cadastrada ainda.</p>
         </div>
@@ -814,6 +850,7 @@
         </header>
         <dl class="recipe-card__summary"></dl>
         <footer class="recipe-card__footer">
+          <button type="button" class="recipe-card__evaluate">Avaliar</button>
           <button type="button" class="recipe-card__details">Ver detalhes</button>
           <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
         </footer>
@@ -850,6 +887,40 @@
           <section class="recipe-detail__section">
             <h4>Fórmula de padeiro</h4>
             <ul class="recipe-card__formula"></ul>
+          </section>
+          <section class="recipe-detail__section">
+            <h4>Registrar avaliação</h4>
+            <form class="recipe-evaluation-form" autocomplete="off" novalidate>
+              <div class="field">
+                <label for="recipe-evaluation-rating">Nota (0-10)</label>
+                <input
+                  id="recipe-evaluation-rating"
+                  name="evaluationRating"
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.5"
+                  required
+                />
+              </div>
+              <div class="field">
+                <label for="recipe-evaluation-notes">Comentários</label>
+                <textarea
+                  id="recipe-evaluation-notes"
+                  name="evaluationNotes"
+                  rows="3"
+                  placeholder="O que deu certo? O que pode melhorar?"
+                ></textarea>
+              </div>
+              <div class="recipe-evaluation-form__actions">
+                <button type="submit">Salvar avaliação</button>
+              </div>
+              <p
+                id="recipe-evaluation-feedback"
+                class="recipe-evaluation-feedback"
+                aria-live="polite"
+              ></p>
+            </form>
           </section>
           <section class="recipe-detail__section">
             <h4>Avaliações</h4>
