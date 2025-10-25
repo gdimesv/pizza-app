@@ -55,8 +55,8 @@
       >
         <h2>1. Cadastrar nova receita</h2>
         <p class="card-subtitle">
-          Construa a massa como um padeiro: defina o estilo, escolha a farinha,
-          planeje a fermentação e feche a fórmula de padeiro.
+          Construa a sua receita: defina o estilo, escolha a farinha,
+          planeje a fermentação e receba no final a fórmula de padeiro.
         </p>
 
         <form id="new-recipe-form" class="recipe-form" autocomplete="off">
@@ -69,9 +69,25 @@
             <legend>1. Objetivo da massa</legend>
             <div
               class="field field-status"
+              data-field-status="required"
+            >
+              <label for="recipe-name">Nome da receita</label>
+              <div class="input-affix has-prefix">
+                <span class="input-affix__prefix" aria-hidden="true">🍕</span>
+                <input
+                  id="recipe-name"
+                  name="recipeName"
+                  type="text"
+                  placeholder="Ex: Napoletana 70% biga"
+                  required
+                />
+              </div>
+            </div>
+            <div
+              class="field field-status"
               data-field-status="optional"
             >
-              <label for="recipe-style">Qual estilo você quer atingir?</label>
+              <label for="recipe-style">Qual será o estilo da sua pizza</label>
               <select id="recipe-style" name="recipeStyle">
                 <option value="">Selecione o estilo</option>
                 <option value="Napoletana">Napoletana</option>
@@ -94,22 +110,6 @@
                 type="text"
                 placeholder="Descreva o estilo desejado"
               />
-            </div>
-            <div
-              class="field field-status"
-              data-field-status="required"
-            >
-              <label for="recipe-name">Nome da receita</label>
-              <div class="input-affix has-prefix">
-                <span class="input-affix__prefix" aria-hidden="true">🍕</span>
-                <input
-                  id="recipe-name"
-                  name="recipeName"
-                  type="text"
-                  placeholder="Ex: Napoletana 70% biga"
-                  required
-                />
-              </div>
             </div>
           </fieldset>
 
@@ -156,8 +156,6 @@
                 <option value="Direta">Direta</option>
                 <option value="Biga">Biga</option>
                 <option value="Poolish">Poolish</option>
-                <option value="Levain">Levain</option>
-                <option value="Outros">Outro método</option>
               </select>
             </div>
             <div
@@ -287,8 +285,6 @@
                   <option value="">Selecione</option>
                   <option value="Biga">Biga</option>
                   <option value="Poolish">Poolish</option>
-                  <option value="Levain">Levain</option>
-                  <option value="Outro">Outro</option>
                 </select>
               </div>
               <div class="field field-inline">
@@ -408,7 +404,7 @@
             </div>
             <div class="field field-status" data-field-status="required">
               <label for="formula-salt">
-                Sal (%)
+                Sal
               </label>
               <div class="input-affix has-suffix">
                 <input
@@ -442,6 +438,7 @@
                 />
                 <span class="input-affix__suffix">%</span>
               </div>
+              <span class="field-hint">Percentual sobre a farinha total.</span>
             </div>
             <div class="field field-status" data-field-status="optional">
               <label for="formula-sugar">
@@ -460,6 +457,7 @@
                 />
                 <span class="input-affix__suffix">%</span>
               </div>
+              <span class="field-hint">Percentual sobre a farinha total.</span>
             </div>
             <div class="field field-status" data-field-status="required">
               <label for="formula-yeast">
@@ -483,7 +481,7 @@
                 class="ghost formula-yeast-auto"
                 aria-describedby="formula-yeast-feedback"
               >
-                Calcular fermento ideal
+                Calcular uma sugestão de fermento
               </button>
               <p
                 id="formula-yeast-feedback"
@@ -498,55 +496,66 @@
               >
                 Sugestão desatualizada — recalcular.
               </p>
-            </div>
-            <div class="field field-status" data-field-status="calculated">
-              <label for="formula-total-flour">
-                Farinha total
-              </label>
-              <div class="input-affix has-suffix">
-                <input
-                  id="formula-total-flour"
-                  name="formulaTotalFlour"
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputmode="decimal"
-                  placeholder="Ex: 1000"
-                  required
-                  readonly
-                />
-                <span class="input-affix__suffix">g</span>
+              <div class="yeast-helpers">
+                <div class="yeast-tooltip">
+                  <button
+                    type="button"
+                    class="yeast-tooltip__trigger"
+                    aria-describedby="yeast-tooltip-content"
+                  >
+                    <span class="yeast-tooltip__icon" aria-hidden="true">ℹ️</span>
+                    <span>Como calculamos?</span>
+                  </button>
+                  <div
+                    class="yeast-tooltip__content"
+                    id="yeast-tooltip-content"
+                    role="tooltip"
+                  >
+                    <p><strong>Lógica completa da sugestão automática</strong></p>
+                    <pre><code>% = clamp(0,01, 1, (base(tempo) × fator_método × 2^((T_ref − T_efetiva)/6)) + ajuste_hidratação)</code></pre>
+                    <ul class="yeast-tooltip__list">
+                      <li>
+                        <strong>base(tempo)</strong> é obtida da tabela:
+                        <span class="yeast-tooltip__table">
+                          <span>48 h → 0,045%</span>
+                          <span>36 h → 0,055%</span>
+                          <span>24 h → 0,080%</span>
+                          <span>18 h → 0,120%</span>
+                          <span>12 h → 0,200%</span>
+                          <span>6 h → 0,350%</span>
+                          <span>&lt; 6 h → 0,500%</span>
+                        </span>
+                      </li>
+                      <li>
+                        <strong>fator_método</strong>: Direta 1,00 · Biga 0,60 · Poolish 0,70.
+                      </li>
+                      <li>
+                        <strong>T_ref</strong> usa 24&nbsp;°C (TA) e 6&nbsp;°C (TC). Calculamos <em>T_efetiva</em> com base no tempo em TA/TC informado. Cada variação de 6&nbsp;°C dobra ou reduz a atividade (fator 2<sup>Δ/6</sup>).
+                      </li>
+                      <li>
+                        <strong>ajuste_hidratação</strong> = clamp(-0,05, 0,05, (hidratação − 60) × 0,002).
+                      </li>
+                    </ul>
+                    <p>
+                      Por fim, convertemos para peso: <code>gramas = (% ÷ 100) × farinha total</code> e também exibimos <code>g/kg</code>.
+                    </p>
+                  </div>
+                </div>
+                <p class="field-hint">
+                  Resultado em fermento biológico seco instantâneo. Para fresco use
+                  1&nbsp;g seco ⇒ 3&nbsp;g fresco.
+                </p>
+                <p class="field-hint field-hint--disclaimer">
+                  <strong>A sugestão é um ponto de partida</strong>: avalie farinha, temperatura local e rotina antes
+                  de finalizar a receita.
+                </p>
               </div>
-              <span class="field-hint"
-                >Pré-calculado a partir das massas desejadas. Ajuste os parâmetros
-                acima para mudar.</span
-              >
             </div>
-            <details class="formula-help">
-              <summary>Sugestões de fermento por temperatura</summary>
-              <ul>
-                <li>
-                  <strong>TA 20&nbsp;°C a 24&nbsp;°C:</strong> 0,1% a 0,2% da farinha
-                  para fermentações longas (&gt;18h)
-                </li>
-                <li>
-                  <strong>TA 24&nbsp;°C a 28&nbsp;°C:</strong> 0,2% a 0,4% para 12h a
-                  18h
-                </li>
-                <li>
-                  <strong>Controlada &lt; 6&nbsp;°C:</strong> 0,05% a 0,1% com maturação
-                  lenta (24h+)
-                </li>
-                <li>
-                  <strong>Mista (TA + TC):</strong> 0,15% a 0,25% dependendo do tempo em
-                  cada etapa
-                </li>
-              </ul>
-              <p class="formula-help__note">
-                Ajuste conforme a força da farinha e a rotina da produção. Valores
-                maiores aceleram a fermentação.
-              </p>
-            </details>
+            <input
+              id="formula-total-flour"
+              name="formulaTotalFlour"
+              type="hidden"
+            />
           </fieldset>
 
           <fieldset class="form-section">
@@ -560,7 +569,7 @@
                 id="recipe-notes"
                 name="recipeNotes"
                 rows="3"
-                placeholder="Anote o racional, tempos, ajustes ou blends"
+                placeholder="Anote racionais, tempos e ajustes que foram necessários"
               ></textarea>
             </div>
           </fieldset>

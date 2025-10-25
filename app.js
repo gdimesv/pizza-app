@@ -320,8 +320,6 @@
     Direta: 1,
     Biga: 0.6,
     Poolish: 0.7,
-    Levain: 0.25,
-    Outros: 0.85,
   };
   const MIN_YEAST_PERCENTAGE = 0.01;
   const MAX_YEAST_PERCENTAGE = 1;
@@ -922,7 +920,7 @@
       YEAST_BASE_TABLE[YEAST_BASE_TABLE.length - 1];
     let percentage = entry.base;
 
-    const methodFactor = METHOD_FACTORS[method] ?? METHOD_FACTORS.Outros;
+    const methodFactor = METHOD_FACTORS[method] ?? METHOD_FACTORS.Direta;
     percentage *= methodFactor;
 
     const defaultTemp = computeDefaultEffectiveTemperature(context);
@@ -2411,13 +2409,13 @@
     prefermentFields.toggleAttribute("hidden", !shouldShow);
     if (shouldShow) {
       prefermentFields.removeAttribute("hidden");
-      if (
-        prefermentTypeSelect &&
-        !prefermentTypeSelect.value &&
-        method &&
-        method !== "Outros"
-      ) {
-        prefermentTypeSelect.value = method;
+      if (prefermentTypeSelect && method) {
+        const hasOption = Array.from(prefermentTypeSelect.options || []).some(
+          (option) => option.value === method
+        );
+        if (!prefermentTypeSelect.value && hasOption) {
+          prefermentTypeSelect.value = method;
+        }
       }
     } else {
       prefermentFields.setAttribute("hidden", "hidden");
@@ -2432,14 +2430,13 @@
     if (!recipeFermentationSelect) return;
     const method = recipeFermentationSelect.value;
     togglePrefermentSection(method);
-    if (
-      prefermentTypeSelect &&
-      method &&
-      method !== "Direta" &&
-      method !== "Outros" &&
-      prefermentTypeSelect.value !== method
-    ) {
-      prefermentTypeSelect.value = method;
+    if (prefermentTypeSelect && method && method !== "Direta") {
+      const hasOption = Array.from(prefermentTypeSelect.options || []).some(
+        (option) => option.value === method
+      );
+      if (hasOption && prefermentTypeSelect.value !== method) {
+        prefermentTypeSelect.value = method;
+      }
     }
     markYeastSuggestionStale();
   }

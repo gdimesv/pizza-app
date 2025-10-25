@@ -1,2 +1,12 @@
-- Na formulação deixar as coisas uma embaixo da outra. Jornada sempre linear
-- Ainda não estou satisfeito com a parte do calculo de fermentação, preciso pensar em alternativas melhores. Talvez trazer a logica do yest calculator para cá. 
+
+- Inverter a ordem dos cards, primeiro o "nome da receita" e depois o card de estilo da pizza
+
+Vamos fazer alguns ajustes de texto agora. 
+
+- De: "Construa a massa como um padeiro: defina o estilo, escolha a farinha, planeje a fermentação e feche a fórmula de padeiro". 
+  Para: "Construa a sua receita: defina o estilo, escolha a farinha, planeje a fermentação e receba no final a fórmula de padeiro". 
+
+
+- De: "Qual estilo você quer atingir?". 
+  Para: "Qual será o estilo da sua pizza". 
+

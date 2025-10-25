@@ -221,38 +221,149 @@ body.dark .form-section {
   margin-top: 0.35rem;
 }
 
-.formula-help {
-  border: 1px dashed var(--border);
-  border-radius: 12px;
+.yeast-helpers {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.yeast-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.yeast-tooltip__trigger {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.yeast-tooltip__trigger:hover,
+.yeast-tooltip__trigger:focus {
+  color: var(--accent-dark);
+}
+
+.yeast-tooltip__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.yeast-tooltip__icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.yeast-tooltip__content {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 260px;
+  max-width: min(320px, 80vw);
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 15;
+}
+
+.yeast-tooltip:hover .yeast-tooltip__content,
+.yeast-tooltip:focus-within .yeast-tooltip__content {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.yeast-tooltip__content p {
+  margin: 0 0 0.4rem;
+}
+
+.yeast-tooltip__content pre {
+  margin: 0 0 0.45rem;
+  padding: 0.45rem 0.6rem;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  font-family: "Fira Code", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+
+.yeast-tooltip__content code {
+  font-family: "Fira Code", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.yeast-tooltip__list {
+  margin: 0;
+  padding-left: 1rem;
   display: grid;
   gap: 0.5rem;
 }
 
-body.dark .formula-help {
-  border-color: var(--border-dark);
-  background: rgba(32, 32, 40, 0.65);
-}
-
-.formula-help summary {
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.formula-help ul {
-  margin: 0;
-  padding-left: 1.2rem;
+.yeast-tooltip__table {
   display: grid;
-  gap: 0.35rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.2rem 0.75rem;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.yeast-tooltip__content ul {
+  margin: 0 0 0 1rem;
+  padding: 0;
   list-style: disc;
 }
 
-.formula-help__note {
-  margin: 0;
-  font-size: 0.85rem;
+.yeast-tooltip__content li + li {
+  margin-top: 0.25rem;
+}
+
+body.dark .yeast-tooltip__content {
+  background: var(--card-bg-dark);
+  color: #f7f6f4;
+  border-color: var(--border-dark);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+body.dark .yeast-tooltip__content pre {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f7f6f4;
+}
+
+body.dark .yeast-tooltip__table {
+  color: #d7d6d3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yeast-tooltip__content {
+    transition: none;
+  }
+}
+
+.field-hint--disclaimer {
   color: var(--text-muted);
+}
+
+body.dark .field-hint--disclaimer {
+  color: #d7d6d3;
 }
 
 .flour-blend__remove {
