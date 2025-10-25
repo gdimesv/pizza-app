@@ -56,8 +56,18 @@
     recipeDetailDialog?.querySelector(".recipe-card__formula") ?? null;
   const recipeDetailRatingsList =
     recipeDetailDialog?.querySelector(".recipe-card__ratings") ?? null;
+  const recipeDetailFactsSection =
+    recipeDetailFacts?.closest(".recipe-detail__section") ?? null;
+  const recipeDetailBlendSection =
+    recipeDetailBlendList?.closest(".recipe-detail__section") ?? null;
+  const recipeDetailFormulaSection =
+    recipeDetailFormulaList?.closest(".recipe-detail__section") ?? null;
+  const recipeDetailRatingsSection =
+    recipeDetailRatingsList?.closest(".recipe-detail__section") ?? null;
   const recipeDetailEvaluationForm =
     recipeDetailDialog?.querySelector(".recipe-evaluation-form") ?? null;
+  const recipeDetailEvaluationSection =
+    recipeDetailEvaluationForm?.closest(".recipe-detail__section") ?? null;
   const recipeDetailEvaluationRating =
     recipeDetailEvaluationForm?.querySelector("#recipe-evaluation-rating") ??
     null;
@@ -159,6 +169,23 @@
   const flourFormTitle = document.querySelector("#flour-form-title");
   const flourFormSubmit = document.querySelector("#flour-form-submit");
   const flourFormCancel = document.querySelector("#flour-form-cancel");
+  const otherRecipeSection = document.querySelector("#other-recipe-section");
+  const otherRecipeListContainer = document.querySelector("#other-recipe-list");
+  const otherRecipeToggleButton = document.querySelector("#other-recipe-toggle");
+  const otherRecipeForm = document.querySelector("#other-recipe-form");
+  const otherRecipeNameInput = document.querySelector("#other-recipe-name");
+  const otherRecipeCategorySelect = document.querySelector(
+    "#other-recipe-category"
+  );
+  const otherRecipeContentInput = document.querySelector(
+    "#other-recipe-content"
+  );
+  const otherRecipeFeedback = document.querySelector("#other-recipe-feedback");
+  const otherRecipeTemplate = document.querySelector(
+    "#other-recipe-card-template"
+  );
+  const otherRecipeCancelButton =
+    otherRecipeForm?.querySelector(".other-recipe-cancel") ?? null;
 
   const state = {
     recipes: [],
@@ -178,6 +205,13 @@
 
   let activeRecipeDetail = null;
 
+  const RECIPE_TYPE_LABELS = {
+    massa: "Massa",
+    molho: "Molho",
+    recheio: "Recheio",
+    outro: "Outra receita",
+  };
+
   const safeStorage = {
     load() {
       try {
@@ -187,10 +221,31 @@
         if (!Array.isArray(parsed)) return [];
         return parsed
           .filter((item) => item && typeof item === "object")
-          .map((item) => ({
-            ...item,
-            ratings: Array.isArray(item.ratings) ? item.ratings : [],
-          }));
+          .map((item) => {
+            const type = normalizeRecipeType(item.type);
+            const createdAt =
+              typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString();
+            const updatedAt =
+              typeof item.updatedAt === "string" ? item.updatedAt : createdAt;
+            const content =
+              typeof item.content === "string" ? item.content : item.notes ?? "";
+            const notesValue =
+              typeof item.notes === "string"
+                ? item.notes
+                : typeof item.content === "string"
+                ? item.content
+                : "";
+            return {
+              ...item,
+              type,
+              category: item.category || RECIPE_TYPE_LABELS[type],
+              content,
+              notes: notesValue,
+              ratings: Array.isArray(item.ratings) ? item.ratings : [],
+              createdAt,
+              updatedAt,
+            };
+          });
       } catch (err) {
         console.error("Falha ao carregar receitas:", err);
         return [];
@@ -358,6 +413,68 @@
       return Number.isFinite(parsed) ? parsed : null;
     }
     return null;
+  }
+
+  function normalizeRecipeType(value) {
+    const key = (value || "").toString().toLowerCase();
+    if (key === "massa" || key === "molho" || key === "recheio" || key === "outro") {
+      return key;
+    }
+    return "massa";
+  }
+
+  function getRecipeTypeLabel(type) {
+    const normalized = normalizeRecipeType(type);
+    return RECIPE_TYPE_LABELS[normalized] ?? RECIPE_TYPE_LABELS.massa;
+  }
+
+  function buildRecipeExcerpt(content, maxLength = 220) {
+    if (!content) return "";
+    const normalized = content.toString().trim();
+    if (!normalized) return "";
+    const lines = normalized.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (!lines.length) return "";
+    let excerpt = "";
+    for (const line of lines) {
+      const candidate = excerpt ? `${excerpt}\n${line}` : line;
+      if (candidate.length > maxLength) {
+        excerpt = `${candidate.slice(0, maxLength).trimEnd()}...`;
+        return excerpt;
+      }
+      excerpt = candidate;
+      if (excerpt.length >= maxLength) break;
+    }
+    return excerpt;
+  }
+
+  function setOtherRecipeFeedback(message, variant = "info") {
+    if (!otherRecipeFeedback) return;
+    otherRecipeFeedback.textContent = message;
+    otherRecipeFeedback.classList.toggle("is-error", variant === "error");
+  }
+
+  function toggleOtherRecipeForm(force) {
+    if (!otherRecipeForm) return;
+    const shouldShow =
+      typeof force === "boolean"
+        ? force
+        : otherRecipeForm.classList.contains("is-hidden");
+    otherRecipeForm.classList.toggle("is-hidden", !shouldShow);
+    if (shouldShow) {
+      otherRecipeForm.classList.remove("is-hidden");
+      setOtherRecipeFeedback("");
+      window.requestAnimationFrame(() => {
+        otherRecipeNameInput?.focus();
+      });
+    } else {
+      otherRecipeForm.classList.add("is-hidden");
+    }
+    if (otherRecipeToggleButton) {
+      otherRecipeToggleButton.textContent = shouldShow
+        ? "Ocultar formulário"
+        : "+ Registrar outra receita";
+      otherRecipeToggleButton.setAttribute("aria-expanded", String(shouldShow));
+    }
   }
 
   function nearlyEqual(a, b, tolerance = 0.01) {
@@ -1189,6 +1306,44 @@
   }
 
   function getRecipeDetails(recipe) {
+    const recipeType = normalizeRecipeType(recipe.type);
+    if (recipeType !== "massa") {
+      const notesText =
+        typeof recipe.content === "string"
+          ? recipe.content
+          : typeof recipe.notes === "string"
+          ? recipe.notes
+          : "";
+      return {
+        type: recipeType,
+        category: getRecipeTypeLabel(recipeType),
+        style: recipe.category ?? getRecipeTypeLabel(recipeType),
+        fermentation: "",
+        fermentationTemperature: "",
+        fermentationTemperatureLabel: "",
+        temperatureDetails: null,
+        flour: "",
+        flourLabel: "",
+        flourBlend: [],
+        flourBlendSummary: "",
+        hydration: null,
+        fermentationTime: null,
+        notes: notesText,
+        photo: null,
+        preferment: null,
+        prefermentLabel: "",
+        totalDoughWeight: null,
+        doughCount: null,
+        doughBallWeight: null,
+        targetDoughWeight: null,
+        flourReference: null,
+        formula: {},
+        yeastSummary: recipe.yeastSummary,
+        yeastLabel: recipe.yeastLabel,
+        yeastEquivalenceLabel: recipe.yeastEquivalenceLabel,
+      };
+    }
+
     const fermentationDetails = recipe.fermentation && typeof recipe.fermentation === "object"
       ? recipe.fermentation
       : {};
@@ -1331,6 +1486,8 @@
     const prefermentLabel = formatPrefermentSummary(preferment);
 
     return {
+      type: recipeType,
+      category: getRecipeTypeLabel(recipeType),
       style,
       fermentation,
       fermentationTemperature,
@@ -1434,10 +1591,27 @@
   }
 
   function renderRecipeList(recipes) {
+    const normalizedRecipes = Array.isArray(recipes)
+      ? recipes
+          .slice()
+          .sort((a, b) => new Date(b.createdAt ?? 0) - new Date(a.createdAt ?? 0))
+      : [];
+    const massRecipes = normalizedRecipes.filter(
+      (recipe) => normalizeRecipeType(recipe.type) === "massa"
+    );
+    const otherRecipes = normalizedRecipes.filter(
+      (recipe) => normalizeRecipeType(recipe.type) !== "massa"
+    );
+
+    renderMassRecipeList(massRecipes);
+    renderOtherRecipeList(otherRecipes);
+  }
+
+  function renderMassRecipeList(recipes) {
     if (!recipeListContainer) return;
     recipeListContainer.innerHTML = "";
 
-    if (!Array.isArray(recipes) || !recipes.length) {
+    if (!recipes.length) {
       recipeListContainer.className = "recipes-empty";
       recipeListContainer.innerHTML =
         "<p>Nenhuma receita cadastrada ainda.</p>";
@@ -1448,129 +1622,219 @@
 
     const templateRoot = recipeTemplate?.content?.firstElementChild ?? null;
 
-    recipes
-      .slice()
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .forEach((recipe) => {
-        const article = templateRoot
-          ? templateRoot.cloneNode(true)
-          : document.createElement("article");
+    recipes.forEach((recipe) => {
+      const article = templateRoot
+        ? templateRoot.cloneNode(true)
+        : document.createElement("article");
 
-        if (!templateRoot) {
-          article.className = "recipe-card";
-          article.innerHTML = `
-            <header class="recipe-card__header">
-              <div>
-                <h3 class="recipe-card__title"></h3>
-                <p class="recipe-card__meta"></p>
-              </div>
-              <strong class="recipe-card__average"></strong>
-            </header>
-            <dl class="recipe-card__summary"></dl>
-            <footer class="recipe-card__footer">
-              <button type="button" class="recipe-card__evaluate">Avaliar</button>
-              <button type="button" class="recipe-card__details">Ver detalhes</button>
-              <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
-            </footer>
-          `;
+      if (!templateRoot) {
+        article.className = "recipe-card";
+        article.innerHTML = `
+          <header class="recipe-card__header">
+            <div>
+              <h3 class="recipe-card__title"></h3>
+              <p class="recipe-card__meta"></p>
+            </div>
+          </header>
+          <p class="recipe-card__average"></p>
+          <dl class="recipe-card__summary"></dl>
+          <footer class="recipe-card__footer">
+            <button type="button" class="recipe-card__evaluate">Avaliar</button>
+            <button type="button" class="recipe-card__details">Ver detalhes</button>
+            <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
+          </footer>
+        `;
+      }
+
+      const titleElement = article.querySelector(".recipe-card__title");
+      if (titleElement) {
+        titleElement.textContent = recipe.name || "Receita sem nome";
+      }
+
+      const metaElement = article.querySelector(".recipe-card__meta");
+      if (metaElement) {
+        const createdLabel = recipe.createdAt
+          ? `Criada em ${formatDate(recipe.createdAt)}`
+          : "Criação não informada";
+        metaElement.textContent = createdLabel;
+      }
+
+      const averageLabel = article.querySelector(".recipe-card__average");
+      if (averageLabel) {
+        const average = computeAverageScore(recipe.ratings);
+        const count = recipe.ratings?.length ?? 0;
+        if (!count) {
+          averageLabel.textContent = "⭐ Sem avaliações";
+        } else {
+          const suffix = count === 1 ? "avaliação" : "avaliações";
+          averageLabel.textContent = `⭐ Nota média ${average} (${count} ${suffix})`;
+        }
+      }
+
+      const details = getRecipeDetails(recipe);
+
+      const summaryElement = article.querySelector(".recipe-card__summary");
+      if (summaryElement) {
+        summaryElement.innerHTML = "";
+        const summaryItems = [];
+
+        summaryItems.push(["Estilo", details.style]);
+        summaryItems.push(["Farinha", details.flourLabel || details.flour]);
+        summaryItems.push(["Fermentação", details.fermentation]);
+
+        const timeLabel = formatHours(details.fermentationTime);
+        if (timeLabel) summaryItems.push(["Tempo total", timeLabel]);
+
+        const hydrationLabel = formatPercentage(details.hydration);
+        if (hydrationLabel) summaryItems.push(["Hidratação", hydrationLabel]);
+
+        if (
+          Number.isFinite(details.doughCount) &&
+          parseNumeric(details.doughBallWeight) !== null
+        ) {
+          const countLabel = Math.round(details.doughCount);
+          const ballWeightLabel = formatWeight(details.doughBallWeight);
+          const totalLabel = formatWeight(
+            details.targetDoughWeight ?? details.totalDoughWeight
+          );
+          const massesLabel = totalLabel
+            ? `${countLabel} × ${ballWeightLabel} = ${totalLabel}`
+            : `${countLabel} × ${ballWeightLabel}`;
+          summaryItems.push(["Massas", massesLabel]);
         }
 
-        const titleElement = article.querySelector(".recipe-card__title");
-        if (titleElement) {
-          titleElement.textContent = recipe.name || "Receita sem nome";
-        }
-
-        const metaElement = article.querySelector(".recipe-card__meta");
-        if (metaElement) {
-          const createdLabel = recipe.createdAt
-            ? `Criada em ${formatDate(recipe.createdAt)}`
-            : "Criação não informada";
-          metaElement.textContent = createdLabel;
-        }
-
-        const averageLabel = article.querySelector(".recipe-card__average");
-        if (averageLabel) {
-          const average = computeAverageScore(recipe.ratings);
-          averageLabel.textContent = average
-            ? `Nota média: ${average}`
-            : "Sem avaliações";
-        }
-
-        const details = getRecipeDetails(recipe);
-
-        const summaryElement = article.querySelector(".recipe-card__summary");
-        if (summaryElement) {
-          summaryElement.innerHTML = "";
-          const summaryItems = [];
-
-          summaryItems.push(["Estilo", details.style]);
-          summaryItems.push(["Farinha", details.flourLabel || details.flour]);
-          summaryItems.push(["Fermentação", details.fermentation]);
-
-          const timeLabel = formatHours(details.fermentationTime);
-          if (timeLabel) summaryItems.push(["Tempo total", timeLabel]);
-
-          const hydrationLabel = formatPercentage(details.hydration);
-          if (hydrationLabel) summaryItems.push(["Hidratação", hydrationLabel]);
-
-          if (
-            Number.isFinite(details.doughCount) &&
-            parseNumeric(details.doughBallWeight) !== null
-          ) {
-            const countLabel = Math.round(details.doughCount);
-            const ballWeightLabel = formatWeight(details.doughBallWeight);
-            const totalLabel = formatWeight(
-              details.targetDoughWeight ?? details.totalDoughWeight
-            );
-            const massesLabel = totalLabel
-              ? `${countLabel} × ${ballWeightLabel} = ${totalLabel}`
-              : `${countLabel} × ${ballWeightLabel}`;
-            summaryItems.push(["Massas", massesLabel]);
-          }
-
-          summaryItems
-            .filter(([, value]) => Boolean(value))
-            .slice(0, 6)
-            .forEach(([label, value]) => {
-              const row = document.createElement("div");
-              const term = document.createElement("dt");
-              const desc = document.createElement("dd");
-              term.textContent = label;
-              desc.textContent = value;
-              row.append(term, desc);
-              summaryElement.appendChild(row);
-            });
-
-          if (!summaryElement.children.length) {
+        summaryItems
+          .filter(([, value]) => Boolean(value))
+          .slice(0, 6)
+          .forEach(([label, value]) => {
             const row = document.createElement("div");
             const term = document.createElement("dt");
             const desc = document.createElement("dd");
-            term.textContent = "Resumo";
-            desc.textContent = "Nenhum dado disponível.";
+            term.textContent = label;
+            desc.textContent = value;
             row.append(term, desc);
             summaryElement.appendChild(row);
-          }
-        }
+          });
 
-        const evaluateButton = article.querySelector(".recipe-card__evaluate");
-        if (evaluateButton) {
-          evaluateButton.addEventListener("click", () =>
-            openRecipeDetail(recipe, { focusEvaluation: true })
-          );
+        if (!summaryElement.children.length) {
+          const row = document.createElement("div");
+          const term = document.createElement("dt");
+          const desc = document.createElement("dd");
+          term.textContent = "Resumo";
+          desc.textContent = "Nenhum dado disponível.";
+          row.append(term, desc);
+          summaryElement.appendChild(row);
         }
+      }
 
-        const detailsButton = article.querySelector(".recipe-card__details");
-        if (detailsButton) {
-          detailsButton.addEventListener("click", () => openRecipeDetail(recipe));
-        }
+      const evaluateButton = article.querySelector(".recipe-card__evaluate");
+      if (evaluateButton) {
+        evaluateButton.addEventListener("click", () =>
+          openRecipeDetail(recipe, { focusEvaluation: true })
+        );
+      }
 
-        const deleteButton = article.querySelector(".recipe-card__delete");
-        if (deleteButton) {
-          deleteButton.addEventListener("click", () => handleRecipeDelete(recipe));
-        }
+      const detailsButton = article.querySelector(".recipe-card__details");
+      if (detailsButton) {
+        detailsButton.addEventListener("click", () => openRecipeDetail(recipe));
+      }
 
-        recipeListContainer.appendChild(article);
-      });
+      const deleteButton = article.querySelector(".recipe-card__delete");
+      if (deleteButton) {
+        deleteButton.addEventListener("click", () => handleRecipeDelete(recipe));
+      }
+
+      recipeListContainer.appendChild(article);
+    });
+  }
+
+  function renderOtherRecipeList(recipes) {
+    if (!otherRecipeListContainer) return;
+    otherRecipeListContainer.innerHTML = "";
+
+    if (!recipes.length) {
+      otherRecipeSection?.classList.add("is-hidden");
+      otherRecipeListContainer.className = "recipes-empty";
+      otherRecipeListContainer.innerHTML =
+        "<p>Nenhuma outra receita cadastrada ainda.</p>";
+      return;
+    }
+
+    otherRecipeSection?.classList.remove("is-hidden");
+    otherRecipeListContainer.className = "other-recipe-grid";
+
+    const templateRoot = otherRecipeTemplate?.content?.firstElementChild ?? null;
+
+    recipes.forEach((recipe) => {
+      const article = templateRoot
+        ? templateRoot.cloneNode(true)
+        : document.createElement("article");
+
+      if (!templateRoot) {
+        article.className = "recipe-card recipe-card--other";
+        article.innerHTML = `
+          <header class="recipe-card__header">
+            <div>
+              <h3 class="recipe-card__title"></h3>
+              <p class="recipe-card__meta"></p>
+            </div>
+            <span class="recipe-card__badge"></span>
+          </header>
+          <p class="recipe-card__average recipe-card__average--other"></p>
+          <div class="recipe-card__summary other-recipe-card__summary">
+            <p class="other-recipe-card__excerpt"></p>
+          </div>
+          <footer class="recipe-card__footer">
+            <button type="button" class="recipe-card__details">Ver detalhes</button>
+            <button type="button" class="recipe-card__delete ghost">Apagar</button>
+          </footer>
+        `;
+      }
+
+      const badge = article.querySelector(".recipe-card__badge");
+      if (badge) {
+        badge.textContent = getRecipeTypeLabel(recipe.type);
+      }
+
+      const title = article.querySelector(".recipe-card__title");
+      if (title) {
+        title.textContent = recipe.name || "Receita sem nome";
+      }
+
+      const meta = article.querySelector(".recipe-card__meta");
+      if (meta) {
+        const created = recipe.createdAt ? `Criada em ${formatDate(recipe.createdAt)}` : "";
+        const updated =
+          recipe.updatedAt && recipe.updatedAt !== recipe.createdAt
+            ? `Atualizada em ${formatDate(recipe.updatedAt)}`
+            : "";
+        meta.textContent = [created, updated].filter(Boolean).join(" • ");
+      }
+
+      const averageLabel = article.querySelector(".recipe-card__average");
+      if (averageLabel) {
+        averageLabel.textContent = "";
+        averageLabel.style.display = "none";
+      }
+
+      const excerptElement = article.querySelector(".other-recipe-card__excerpt");
+      if (excerptElement) {
+        const excerpt = buildRecipeExcerpt(recipe.content || recipe.notes || "");
+        excerptElement.textContent = excerpt || "Sem anotações registradas.";
+      }
+
+      const detailsButton = article.querySelector(".recipe-card__details");
+      if (detailsButton) {
+        detailsButton.addEventListener("click", () => openRecipeDetail(recipe));
+      }
+
+      const deleteButton = article.querySelector(".recipe-card__delete");
+      if (deleteButton) {
+        deleteButton.addEventListener("click", () => handleRecipeDelete(recipe));
+      }
+
+      otherRecipeListContainer.appendChild(article);
+    });
   }
 
   function populateRecipeDetail(
@@ -1582,6 +1846,7 @@
 
     const ratings = Array.isArray(recipe.ratings) ? recipe.ratings : [];
     const details = getRecipeDetails(recipe);
+    const isMassRecipe = normalizeRecipeType(recipe.type) === "massa";
 
     if (recipeDetailTitle) {
       recipeDetailTitle.textContent = recipe.name || "Receita sem nome";
@@ -1624,51 +1889,57 @@
     }
 
     if (recipeDetailFacts) {
-      recipeDetailFacts.innerHTML = "";
-      const facts = [];
-      facts.push(["Estilo", details.style]);
-      facts.push(["Farinha", details.flourLabel || details.flour]);
-      facts.push(["Fermentação", details.fermentation]);
-      facts.push(["Temperatura", details.fermentationTemperatureLabel]);
-      if (
-        Number.isFinite(details.doughCount) &&
-        parseNumeric(details.doughBallWeight) !== null
-      ) {
-        const countLabel = Math.round(details.doughCount);
-        const ballWeightLabel = formatWeight(details.doughBallWeight);
-        const totalLabel = formatWeight(
-          details.targetDoughWeight ?? details.totalDoughWeight
-        );
-        const massesLabel = totalLabel
-          ? `${countLabel} × ${ballWeightLabel} = ${totalLabel}`
-          : `${countLabel} × ${ballWeightLabel}`;
-        facts.push(["Massas", massesLabel]);
-      }
-      facts.push(["Pré-fermento", details.prefermentLabel]);
-      facts.push(["Hidratação", formatPercentage(details.hydration)]);
-      facts.push(["Massa total", formatWeight(details.totalDoughWeight)]);
-      facts.push(["Tempo total", formatHours(details.fermentationTime)]);
+      if (!isMassRecipe) {
+        recipeDetailFacts.innerHTML = "";
+        recipeDetailFactsSection?.classList.add("is-hidden");
+      } else {
+        recipeDetailFactsSection?.classList.remove("is-hidden");
+        recipeDetailFacts.innerHTML = "";
+        const facts = [];
+        facts.push(["Estilo", details.style]);
+        facts.push(["Farinha", details.flourLabel || details.flour]);
+        facts.push(["Fermentação", details.fermentation]);
+        facts.push(["Temperatura", details.fermentationTemperatureLabel]);
+        if (
+          Number.isFinite(details.doughCount) &&
+          parseNumeric(details.doughBallWeight) !== null
+        ) {
+          const countLabel = Math.round(details.doughCount);
+          const ballWeightLabel = formatWeight(details.doughBallWeight);
+          const totalLabel = formatWeight(
+            details.targetDoughWeight ?? details.totalDoughWeight
+          );
+          const massesLabel = totalLabel
+            ? `${countLabel} × ${ballWeightLabel} = ${totalLabel}`
+            : `${countLabel} × ${ballWeightLabel}`;
+          facts.push(["Massas", massesLabel]);
+        }
+        facts.push(["Pré-fermento", details.prefermentLabel]);
+        facts.push(["Hidratação", formatPercentage(details.hydration)]);
+        facts.push(["Massa total", formatWeight(details.totalDoughWeight)]);
+        facts.push(["Tempo total", formatHours(details.fermentationTime)]);
 
-      facts
-        .filter(([, value]) => Boolean(value))
-        .forEach(([label, value]) => {
+        facts
+          .filter(([, value]) => Boolean(value))
+          .forEach(([label, value]) => {
+            const row = document.createElement("div");
+            const term = document.createElement("dt");
+            const desc = document.createElement("dd");
+            term.textContent = label;
+            desc.textContent = value;
+            row.append(term, desc);
+            recipeDetailFacts.appendChild(row);
+          });
+
+        if (!recipeDetailFacts.children.length) {
           const row = document.createElement("div");
           const term = document.createElement("dt");
           const desc = document.createElement("dd");
-          term.textContent = label;
-          desc.textContent = value;
+          term.textContent = "Resumo";
+          desc.textContent = "Nenhum detalhe registrado ainda.";
           row.append(term, desc);
           recipeDetailFacts.appendChild(row);
-        });
-
-      if (!recipeDetailFacts.children.length) {
-        const row = document.createElement("div");
-        const term = document.createElement("dt");
-        const desc = document.createElement("dd");
-        term.textContent = "Resumo";
-        desc.textContent = "Nenhum detalhe registrado ainda.";
-        row.append(term, desc);
-        recipeDetailFacts.appendChild(row);
+        }
       }
     }
 
@@ -1682,30 +1953,49 @@
       }
     }
 
-    renderFlourBlendList(recipeDetailBlendList, details.flourBlend);
-    renderFormulaList(recipeDetailFormulaList, details);
+    if (isMassRecipe) {
+      recipeDetailBlendSection?.classList.remove("is-hidden");
+      recipeDetailFormulaSection?.classList.remove("is-hidden");
+      renderFlourBlendList(recipeDetailBlendList, details.flourBlend);
+      renderFormulaList(recipeDetailFormulaList, details);
+    } else {
+      recipeDetailBlendSection?.classList.add("is-hidden");
+      recipeDetailFormulaSection?.classList.add("is-hidden");
+      if (recipeDetailBlendList) recipeDetailBlendList.innerHTML = "";
+      if (recipeDetailFormulaList) recipeDetailFormulaList.innerHTML = "";
+    }
 
     if (recipeDetailRatingsList) {
-      recipeDetailRatingsList.innerHTML = "";
-      if (ratings.length) {
-        ratings
-          .slice()
-          .sort((a, b) => new Date(b.date) - new Date(a.date))
-          .forEach((rating) => {
-            const item = document.createElement("li");
-            item.textContent = `${formatDate(rating.date)} — Nota ${
-              rating.score
-            }${rating.notes ? ` • ${rating.notes}` : ""}`;
-            recipeDetailRatingsList.appendChild(item);
-          });
+      if (!isMassRecipe) {
+        recipeDetailRatingsList.innerHTML = "";
+        recipeDetailRatingsSection?.classList.add("is-hidden");
       } else {
-        const item = document.createElement("li");
-        item.textContent = "Sem avaliações registradas.";
-        recipeDetailRatingsList.appendChild(item);
+        recipeDetailRatingsSection?.classList.remove("is-hidden");
+        recipeDetailRatingsList.innerHTML = "";
+        if (ratings.length) {
+          ratings
+            .slice()
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+            .forEach((rating) => {
+              const item = document.createElement("li");
+              item.textContent = `${formatDate(rating.date)} — Nota ${
+                rating.score
+              }${rating.notes ? ` • ${rating.notes}` : ""}`;
+              recipeDetailRatingsList.appendChild(item);
+            });
+        } else {
+          const item = document.createElement("li");
+          item.textContent = "Sem avaliações registradas.";
+          recipeDetailRatingsList.appendChild(item);
+        }
       }
     }
 
     if (recipeDetailEvaluationForm) {
+      recipeDetailEvaluationForm.classList.toggle("is-hidden", !isMassRecipe);
+      if (recipeDetailEvaluationSection) {
+        recipeDetailEvaluationSection.classList.toggle("is-hidden", !isMassRecipe);
+      }
       recipeDetailEvaluationForm.dataset.recipeId = recipe.id;
       if (!keepEvaluationInputs) {
         if (recipeDetailEvaluationForm instanceof HTMLFormElement) {
@@ -1714,6 +2004,9 @@
         if (recipeDetailEvaluationRating) recipeDetailEvaluationRating.value = "";
         if (recipeDetailEvaluationNotes) recipeDetailEvaluationNotes.value = "";
       }
+    }
+    if (!isMassRecipe && recipeDetailEvaluationFeedback) {
+      recipeDetailEvaluationFeedback.textContent = "";
     }
     if (!preserveEvaluationMessage && recipeDetailEvaluationFeedback) {
       recipeDetailEvaluationFeedback.textContent = "";
@@ -1738,7 +2031,11 @@
         }
       }
     }
-    if (focusEvaluation && recipeDetailEvaluationRating) {
+    if (
+      focusEvaluation &&
+      normalizeRecipeType(recipe.type) === "massa" &&
+      recipeDetailEvaluationRating
+    ) {
       recipeDetailEvaluationRating.focus();
     }
   }
@@ -1837,32 +2134,57 @@
 
     if (!cloneSource) {
       card.className = "flour-card";
-      const title = document.createElement("h3");
-      title.textContent = flour.name || "Farinha sem nome";
-      card.appendChild(title);
-      const paragraph = document.createElement("p");
-      const proteinLabel = formatPercentage(flour.protein) || "—";
-      const strengthLabel =
-        parseNumeric(flour.strength) !== null
-          ? smallDecimalFormatter.format(parseNumeric(flour.strength))
-          : "—";
-      paragraph.textContent = `Tipo: ${flour.type || "—"} • Proteína: ${
-        proteinLabel || "—"
-      } • W: ${strengthLabel}`;
-      card.appendChild(paragraph);
-      const editFallback = document.createElement("button");
-      editFallback.type = "button";
-      editFallback.textContent = "Editar";
-      editFallback.className = "flour-card__edit";
-      editFallback.addEventListener("click", () => openFlourForm(flour));
-      card.appendChild(editFallback);
-      const deleteFallback = document.createElement("button");
-      deleteFallback.type = "button";
-      deleteFallback.textContent = "Apagar";
-      deleteFallback.className = "flour-card__delete";
-      deleteFallback.addEventListener("click", () => handleFlourDelete(flour));
-      card.appendChild(deleteFallback);
-      return card;
+      card.innerHTML = `
+        <header class="flour-card__header">
+          <div>
+            <h3 class="flour-card__title"></h3>
+            <p class="flour-card__meta"></p>
+          </div>
+        </header>
+        <dl class="flour-card__overview">
+          <div>
+            <dt>Tipo</dt>
+            <dd class="flour-card__type">—</dd>
+          </div>
+          <div>
+            <dt>Proteína</dt>
+            <dd class="flour-card__protein">—</dd>
+          </div>
+          <div>
+            <dt>Força W</dt>
+            <dd class="flour-card__strength">—</dd>
+          </div>
+        </dl>
+        <details class="flour-card__details">
+          <summary>Ver detalhes</summary>
+          <dl>
+            <div>
+              <dt>P/L</dt>
+              <dd class="flour-card__pl">—</dd>
+            </div>
+            <div>
+              <dt>Absorção de água</dt>
+              <dd class="flour-card__absorption">—</dd>
+            </div>
+            <div>
+              <dt>Moagem</dt>
+              <dd class="flour-card__milling">—</dd>
+            </div>
+            <div>
+              <dt>Validade</dt>
+              <dd class="flour-card__expiration">—</dd>
+            </div>
+            <div>
+              <dt>Observações</dt>
+              <dd class="flour-card__notes">—</dd>
+            </div>
+          </dl>
+        </details>
+        <footer class="flour-card__actions">
+          <button type="button" class="flour-card__edit">Editar</button>
+          <button type="button" class="flour-card__delete">Apagar</button>
+        </footer>
+      `;
     }
 
     const title = card.querySelector(".flour-card__title");
@@ -2562,6 +2884,65 @@
     }
   }
 
+  function handleOtherRecipeSubmit(event) {
+    event.preventDefault();
+    if (!otherRecipeForm) return;
+
+    const formData = new FormData(otherRecipeForm);
+    const name = (formData.get("otherRecipeName") || "").toString().trim();
+    const categoryRaw = (formData.get("otherRecipeCategory") || "outro")
+      .toString()
+      .trim();
+    const content = (formData.get("otherRecipeContent") || "").toString().trim();
+
+    if (!name) {
+      setOtherRecipeFeedback("Informe um nome para identificar a receita.", "error");
+      otherRecipeNameInput?.focus();
+      return;
+    }
+
+    if (!content) {
+      setOtherRecipeFeedback("Anote os detalhes da receita antes de salvar.", "error");
+      otherRecipeContentInput?.focus();
+      return;
+    }
+
+    const type = normalizeRecipeType(categoryRaw);
+    const timestamp = new Date().toISOString();
+    const recipe = {
+      id: crypto.randomUUID(),
+      type,
+      category: getRecipeTypeLabel(type),
+      name,
+      content,
+      notes: content,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      ratings: [],
+    };
+
+    state.recipes.push(recipe);
+    safeStorage.save(state.recipes);
+    syncUI();
+    setOtherRecipeFeedback("Receita registrada.", "info");
+    otherRecipeForm.reset();
+    toggleOtherRecipeForm(false);
+    setOtherRecipeFeedback("");
+    showFeedback(`Receita "${name}" registrada.`);
+  }
+
+  function handleOtherRecipeToggle() {
+    toggleOtherRecipeForm();
+  }
+
+  function handleOtherRecipeCancel(event) {
+    event.preventDefault();
+    if (!otherRecipeForm) return;
+    otherRecipeForm.reset();
+    setOtherRecipeFeedback("");
+    toggleOtherRecipeForm(false);
+  }
+
   function handleNewRecipeReset() {
     const shouldSkip = state.skipResetEffects;
     clearPhotoPreview();
@@ -3179,6 +3560,8 @@
 
     const recipe = {
       id: crypto.randomUUID(),
+      type: "massa",
+      category: getRecipeTypeLabel("massa"),
       name,
       style,
       styleCategory: styleChoice,
@@ -3204,6 +3587,7 @@
       },
       photo: state.pendingPhoto ? { ...state.pendingPhoto } : null,
       notes,
+      content: notes,
       createdAt: timestamp,
       updatedAt: timestamp,
       ratings: [],
@@ -3249,6 +3633,14 @@
     if (!recipe) {
       setRecipeEvaluationFeedback(
         "Receita não encontrada. Atualize a página e tente novamente.",
+        "error"
+      );
+      return null;
+    }
+
+    if (normalizeRecipeType(recipe.type) !== "massa") {
+      setRecipeEvaluationFeedback(
+        "Avaliações estão disponíveis apenas para receitas de massa.",
         "error"
       );
       return null;
@@ -3322,6 +3714,17 @@
         );
         flourTabButton?.focus();
       });
+    }
+    if (otherRecipeToggleButton) {
+      otherRecipeToggleButton.addEventListener("click", handleOtherRecipeToggle);
+    }
+    if (otherRecipeForm) {
+      otherRecipeForm.addEventListener("submit", handleOtherRecipeSubmit);
+      toggleOtherRecipeForm(false);
+      setOtherRecipeFeedback("");
+    }
+    if (otherRecipeCancelButton) {
+      otherRecipeCancelButton.addEventListener("click", handleOtherRecipeCancel);
     }
     if (flourBlendAddButton) {
       flourBlendAddButton.addEventListener("click", () => addFlourBlendRow());
