@@ -169,7 +169,6 @@
   const flourFormTitle = document.querySelector("#flour-form-title");
   const flourFormSubmit = document.querySelector("#flour-form-submit");
   const flourFormCancel = document.querySelector("#flour-form-cancel");
-  const otherRecipeSection = document.querySelector("#other-recipe-section");
   const otherRecipeListContainer = document.querySelector("#other-recipe-list");
   const otherRecipeToggleButton = document.querySelector("#other-recipe-toggle");
   const otherRecipeForm = document.querySelector("#other-recipe-form");
@@ -472,7 +471,7 @@
     if (otherRecipeToggleButton) {
       otherRecipeToggleButton.textContent = shouldShow
         ? "Ocultar formulário"
-        : "+ Registrar outra receita";
+        : "+ Registrar outras receitas";
       otherRecipeToggleButton.setAttribute("aria-expanded", String(shouldShow));
     }
   }
@@ -1753,14 +1752,12 @@
     otherRecipeListContainer.innerHTML = "";
 
     if (!recipes.length) {
-      otherRecipeSection?.classList.add("is-hidden");
       otherRecipeListContainer.className = "recipes-empty";
       otherRecipeListContainer.innerHTML =
         "<p>Nenhuma outra receita cadastrada ainda.</p>";
       return;
     }
 
-    otherRecipeSection?.classList.remove("is-hidden");
     otherRecipeListContainer.className = "other-recipe-grid";
 
     const templateRoot = otherRecipeTemplate?.content?.firstElementChild ?? null;

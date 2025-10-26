@@ -658,56 +658,6 @@
         hidden
       >
         <h2>2. Receitas registradas</h2>
-        <div class="other-recipe-cta">
-          <button
-            type="button"
-            id="other-recipe-toggle"
-            class="ghost other-recipe-cta__button"
-            aria-expanded="false"
-            aria-controls="other-recipe-form"
-          >
-            + Registrar outras receitas
-          </button>
-          <p class="other-recipe-cta__hint">
-            Registre também molhos, coberturas e o que mais achar relevante.
-          </p>
-        </div>
-        <form id="other-recipe-form" class="other-recipe-form is-hidden" autocomplete="off">
-          <div class="field field-status" data-field-status="required">
-            <label for="other-recipe-name">Nome da receita</label>
-            <input
-              id="other-recipe-name"
-              name="otherRecipeName"
-              type="text"
-              placeholder="Ex: Molho de tomate da casa"
-              required
-            />
-          </div>
-          <div class="field">
-            <label for="other-recipe-category">Categoria</label>
-            <select id="other-recipe-category" name="otherRecipeCategory">
-              <option value="molho">Molho</option>
-              <option value="recheio">Recheio</option>
-              <option value="outro">Outra receita</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="other-recipe-content">Anotações</label>
-            <textarea
-              id="other-recipe-content"
-              name="otherRecipeContent"
-              rows="4"
-              placeholder="Liste ingredientes, proporções ou observações importantes."
-              required
-            ></textarea>
-          </div>
-          <div class="form-actions">
-            <button type="reset" class="ghost other-recipe-cancel">Cancelar</button>
-            <button type="submit">Salvar receita</button>
-          </div>
-          <p id="other-recipe-feedback" class="form-feedback" aria-live="polite"></p>
-        </form>
-
         <section class="recipe-collection" id="recipe-collection-mass">
           <h3 class="recipe-collection__title">Massas cadastradas</h3>
           <div id="recipe-list" class="recipes-empty">
@@ -715,8 +665,57 @@
           </div>
         </section>
 
-        <section class="recipe-collection is-hidden" id="other-recipe-section">
+        <section class="recipe-collection" id="other-recipe-section">
           <h3 class="recipe-collection__title">Outras receitas</h3>
+          <div class="other-recipe-cta">
+            <button
+              type="button"
+              id="other-recipe-toggle"
+              class="ghost other-recipe-cta__button"
+              aria-expanded="false"
+              aria-controls="other-recipe-form"
+            >
+              + Registrar outras receitas
+            </button>
+            <p class="other-recipe-cta__hint">
+              Registre também molhos, coberturas e o que mais achar relevante.
+            </p>
+          </div>
+          <form id="other-recipe-form" class="other-recipe-form is-hidden" autocomplete="off">
+            <div class="field field-status" data-field-status="required">
+              <label for="other-recipe-name">Nome da receita</label>
+              <input
+                id="other-recipe-name"
+                name="otherRecipeName"
+                type="text"
+                placeholder="Ex: Molho de tomate da casa"
+                required
+              />
+            </div>
+            <div class="field">
+              <label for="other-recipe-category">Categoria</label>
+              <select id="other-recipe-category" name="otherRecipeCategory">
+                <option value="molho">Molho</option>
+                <option value="recheio">Recheio</option>
+                <option value="outro">Outra receita</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="other-recipe-content">Anotações</label>
+              <textarea
+                id="other-recipe-content"
+                name="otherRecipeContent"
+                rows="4"
+                placeholder="Liste ingredientes, proporções ou observações importantes."
+                required
+              ></textarea>
+            </div>
+            <div class="form-actions">
+              <button type="reset" class="ghost other-recipe-cancel">Cancelar</button>
+              <button type="submit">Salvar receita</button>
+            </div>
+            <p id="other-recipe-feedback" class="form-feedback" aria-live="polite"></p>
+          </form>
           <div id="other-recipe-list" class="recipes-empty">
             <p>Nenhuma outra receita cadastrada ainda.</p>
           </div>
