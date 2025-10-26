@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "analytics": {
+    "enabled": true
+  },
+  "routes": [
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
