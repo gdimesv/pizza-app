@@ -185,6 +185,9 @@
   );
   const otherRecipeCancelButton =
     otherRecipeForm?.querySelector(".other-recipe-cancel") ?? null;
+  const dataExportButton = document.querySelector("#data-export");
+  const dataImportButton = document.querySelector("#data-import");
+  const dataImportInput = document.querySelector("#data-import-input");
 
   const state = {
     recipes: [],
@@ -211,40 +214,80 @@
     outro: "Outra receita",
   };
 
+  function sanitizeRecipesData(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter((item) => item && typeof item === "object")
+      .map((item) => {
+        const type = normalizeRecipeType(item.type);
+        const createdAt =
+          typeof item.createdAt === "string"
+            ? item.createdAt
+            : new Date().toISOString();
+        const updatedAt =
+          typeof item.updatedAt === "string" ? item.updatedAt : createdAt;
+        const content =
+          typeof item.content === "string" ? item.content : item.notes ?? "";
+        const notesValue =
+          typeof item.notes === "string"
+            ? item.notes
+            : typeof item.content === "string"
+            ? item.content
+            : "";
+        return {
+          ...item,
+          type,
+          category: item.category || RECIPE_TYPE_LABELS[type],
+          content,
+          notes: notesValue,
+          ratings: Array.isArray(item.ratings) ? item.ratings : [],
+          createdAt,
+          updatedAt,
+        };
+      });
+  }
+
+  function sanitizeFloursData(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter((item) => item && typeof item === "object")
+      .map((item) => {
+        const toIsoOrNull = (raw) => {
+          if (!raw) return null;
+          const date = new Date(raw);
+          return Number.isNaN(date.getTime()) ? null : date.toISOString();
+        };
+
+        const createdAt = toIsoOrNull(item.createdAt) ?? new Date().toISOString();
+        const updatedAt = toIsoOrNull(item.updatedAt) ?? createdAt;
+
+        return {
+          id:
+            typeof item.id === "string" && item.id.trim()
+              ? item.id
+              : crypto.randomUUID(),
+          name: (item.name || "").toString().trim(),
+          type: (item.type || "").toString().trim(),
+          protein: parseNumeric(item.protein),
+          strength: parseNumeric(item.strength ?? item.w),
+          pl: parseNumeric(item.pl ?? item.plValue),
+          absorption: parseNumeric(item.absorption),
+          milling: (item.milling || item.grinding || "").toString().trim(),
+          expirationDate: toIsoOrNull(item.expirationDate ?? item.expiration),
+          notes: (item.notes || item.observations || "").toString().trim(),
+          createdAt,
+          updatedAt,
+        };
+      });
+  }
+
   const safeStorage = {
     load() {
       try {
         const raw = localStorage.getItem(storageKey);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-          .filter((item) => item && typeof item === "object")
-          .map((item) => {
-            const type = normalizeRecipeType(item.type);
-            const createdAt =
-              typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString();
-            const updatedAt =
-              typeof item.updatedAt === "string" ? item.updatedAt : createdAt;
-            const content =
-              typeof item.content === "string" ? item.content : item.notes ?? "";
-            const notesValue =
-              typeof item.notes === "string"
-                ? item.notes
-                : typeof item.content === "string"
-                ? item.content
-                : "";
-            return {
-              ...item,
-              type,
-              category: item.category || RECIPE_TYPE_LABELS[type],
-              content,
-              notes: notesValue,
-              ratings: Array.isArray(item.ratings) ? item.ratings : [],
-              createdAt,
-              updatedAt,
-            };
-          });
+        return sanitizeRecipesData(parsed);
       } catch (err) {
         console.error("Falha ao carregar receitas:", err);
         return [];
@@ -268,37 +311,7 @@
         const raw = localStorage.getItem(flourStorageKey);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-          .filter((item) => item && typeof item === "object")
-          .map((item) => {
-            const toIsoOrNull = (value) => {
-              if (!value) return null;
-              const date = new Date(value);
-              return Number.isNaN(date.getTime()) ? null : date.toISOString();
-            };
-
-            const createdAt = toIsoOrNull(item.createdAt) ?? new Date().toISOString();
-            const updatedAt = toIsoOrNull(item.updatedAt) ?? createdAt;
-
-            return {
-              id:
-                typeof item.id === "string" && item.id.trim()
-                  ? item.id
-                  : crypto.randomUUID(),
-              name: (item.name || "").toString().trim(),
-              type: (item.type || "").toString().trim(),
-              protein: parseNumeric(item.protein),
-              strength: parseNumeric(item.strength ?? item.w),
-              pl: parseNumeric(item.pl ?? item.plValue),
-              absorption: parseNumeric(item.absorption),
-              milling: (item.milling || item.grinding || "").toString().trim(),
-              expirationDate: toIsoOrNull(item.expirationDate ?? item.expiration),
-              notes: (item.notes || item.observations || "").toString().trim(),
-              createdAt,
-              updatedAt,
-            };
-          });
+        return sanitizeFloursData(parsed);
       } catch (err) {
         console.error("Falha ao carregar farinhas:", err);
         return [];
@@ -2543,7 +2556,151 @@
     updateBlendTotal();
     showFeedback(`Farinha "${label}" removida.`);
   }
- 
+
+  function buildBackupPayload() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      recipes: state.recipes,
+      flours: state.flours,
+    };
+  }
+
+  function handleDataExport() {
+    try {
+      const payload = buildBackupPayload();
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = `pizza-app-backup-${timestamp}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      showFeedback("Backup exportado. Guarde o arquivo em um local seguro.");
+    } catch (err) {
+      console.error("Falha ao exportar dados:", err);
+      showFeedback("Não foi possível exportar os dados. Tente novamente.");
+    }
+  }
+
+  function restoreFromBackup(data) {
+    if (!data || typeof data !== "object") {
+      showFeedback("O arquivo selecionado não está no formato esperado.");
+      return;
+    }
+
+    const hasRecipesArray = Array.isArray(data.recipes);
+    const hasFloursArray = Array.isArray(data.flours);
+    if (!hasRecipesArray && !hasFloursArray) {
+      showFeedback(
+        "Nenhum dado compatível foi encontrado no arquivo. Verifique se ele foi exportado pelo Pizza App."
+      );
+      return;
+    }
+
+    const recipesRaw = hasRecipesArray ? data.recipes : [];
+    const floursRaw = hasFloursArray ? data.flours : [];
+    const recipes = sanitizeRecipesData(recipesRaw);
+    const flours = sanitizeFloursData(floursRaw);
+
+    const hasExistingData = state.recipes.length || state.flours.length;
+    if (hasExistingData) {
+      const proceed = window.confirm(
+        "Importar este arquivo vai substituir todas as receitas e farinhas atuais. Deseja continuar?"
+      );
+      if (!proceed) {
+        showFeedback("Importação cancelada.");
+        return;
+      }
+    }
+
+    state.recipes = recipes;
+    state.flours = flours;
+    safeStorage.save(state.recipes);
+    flourStorage.save(state.flours);
+    state.pendingPhoto = null;
+    clearPhotoPreview();
+    closeRecipeDetail();
+    toggleOtherRecipeForm(false);
+    if (otherRecipeForm) {
+      otherRecipeForm.reset();
+    }
+    setOtherRecipeFeedback("");
+    state.flourFilters = {
+      type: "all",
+      protein: "all",
+      strength: "all",
+    };
+    if (flourFiltersForm) {
+      flourFiltersForm.reset();
+    }
+    if (flourFilterType) flourFilterType.value = "all";
+    if (flourFilterProtein) flourFilterProtein.value = "all";
+    if (flourFilterStrength) flourFilterStrength.value = "all";
+    state.skipResetEffects = false;
+    if (newRecipeForm) {
+      newRecipeForm.reset();
+    }
+    hideSuccessSummary();
+    updateFlourTypeFilterOptions();
+    renderFlourList();
+    updateAllBlendSelectOptions();
+    updateBlendTotal();
+    resetBlendRows();
+    syncUI();
+    showFeedback("Dados importados com sucesso!");
+  }
+
+  function handleDataImportClick(event) {
+    event.preventDefault();
+    if (!dataImportInput) {
+      showFeedback("Importação não disponível neste navegador.");
+      return;
+    }
+    dataImportInput.value = "";
+    dataImportInput.click();
+  }
+
+  function handleDataImportFileChange(event) {
+    const input = event.target;
+    if (!input || !input.files || !input.files.length) return;
+    const [file] = input.files;
+    input.value = "";
+
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showFeedback("O arquivo excede o limite de 2MB. Verifique se selecionou o backup correto.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = typeof reader.result === "string" ? reader.result : "";
+      if (!text) {
+        showFeedback("Não foi possível ler o arquivo selecionado.");
+        return;
+      }
+      try {
+        const parsed = JSON.parse(text);
+        restoreFromBackup(parsed);
+      } catch (err) {
+        console.error("Falha ao importar dados:", err);
+        showFeedback(
+          "Arquivo inválido. Verifique se você selecionou um backup exportado pelo Pizza App."
+        );
+      }
+    };
+    reader.onerror = () => {
+      console.error("Falha ao ler arquivo de importação.");
+      showFeedback("Não foi possível ler o arquivo selecionado. Tente novamente.");
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
   function toggleStyleCustomField(value) {
     if (!recipeStyleCustomGroup || !recipeStyleCustomInput) return;
     const shouldShow = value === "Outro";
@@ -3722,6 +3879,15 @@
     }
     if (otherRecipeCancelButton) {
       otherRecipeCancelButton.addEventListener("click", handleOtherRecipeCancel);
+    }
+    if (dataExportButton) {
+      dataExportButton.addEventListener("click", handleDataExport);
+    }
+    if (dataImportButton) {
+      dataImportButton.addEventListener("click", handleDataImportClick);
+    }
+    if (dataImportInput) {
+      dataImportInput.addEventListener("change", handleDataImportFileChange);
     }
     if (flourBlendAddButton) {
       flourBlendAddButton.addEventListener("click", () => addFlourBlendRow());

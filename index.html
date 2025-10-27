@@ -658,6 +658,26 @@
         hidden
       >
         <h2>2. Receitas registradas</h2>
+        <section class="data-transfer" aria-label="Backup de dados">
+          <div class="data-transfer__info">
+            <h3 class="data-transfer__title">Backup de dados</h3>
+            <p class="data-transfer__hint">
+              Exporte suas receitas e importe novamente em outro navegador.
+            </p>
+          </div>
+          <div class="data-transfer__actions">
+            <button type="button" id="data-export">Exportar dados</button>
+            <button type="button" id="data-import" class="ghost">Importar dados</button>
+          </div>
+        </section>
+        <input
+          type="file"
+          id="data-import-input"
+          accept="application/json"
+          class="visually-hidden"
+          aria-hidden="true"
+          tabindex="-1"
+        />
         <section class="recipe-collection" id="recipe-collection-mass">
           <h3 class="recipe-collection__title">Massas cadastradas</h3>
           <div id="recipe-list" class="recipes-empty">
