@@ -8,7 +8,16 @@
   </head>
   <body>
     <header>
-      <h1>MyPizzas</h1>
+      <div class="header-top">
+        <h1>MyPizzas</h1>
+        <label class="language-switcher" for="language-switcher">
+          <span>Idioma</span>
+          <select id="language-switcher" aria-label="Selecione o idioma">
+            <option value="pt">Português</option>
+            <option value="en">Inglês</option>
+          </select>
+        </label>
+      </div>
       <p>Registre, avalie e consulte suas pizzas favoritas.</p>
     </header>
 
@@ -940,6 +949,8 @@
         <footer class="recipe-card__footer">
           <button type="button" class="recipe-card__evaluate">Avaliar</button>
           <button type="button" class="recipe-card__details">Ver detalhes</button>
+          <button type="button" class="recipe-card__edit ghost">Editar</button>
+          <button type="button" class="recipe-card__duplicate ghost">Duplicar</button>
           <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
         </footer>
       </article>
@@ -960,6 +971,8 @@
         </div>
         <footer class="recipe-card__footer">
           <button type="button" class="recipe-card__details">Ver detalhes</button>
+          <button type="button" class="recipe-card__edit ghost">Editar</button>
+          <button type="button" class="recipe-card__duplicate ghost">Duplicar</button>
           <button type="button" class="recipe-card__delete ghost">Apagar</button>
         </footer>
       </article>
@@ -1036,6 +1049,14 @@
           </section>
         </div>
         <footer class="recipe-detail__footer">
+          <div class="recipe-detail__actions">
+            <button type="button" class="recipe-detail__edit ghost">
+              Editar receita
+            </button>
+            <button type="button" class="recipe-detail__duplicate ghost">
+              Duplicar receita
+            </button>
+          </div>
           <button type="button" class="recipe-detail__delete ghost">
             Apagar receita
           </button>

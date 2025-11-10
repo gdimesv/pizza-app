@@ -1,6 +1,9 @@
 (() => {
   const storageKey = "pizzaApp.recipes";
   const flourStorageKey = "pizzaApp.flours";
+  const localeStorageKey = "pizzaApp.locale";
+  const supportedLocales = ["pt", "en"];
+  const defaultLocale = "pt";
   const newRecipeForm = document.querySelector("#new-recipe-form");
   const recipeListContainer = document.querySelector("#recipe-list");
   const feedbackDialog = document.querySelector("#feedback-dialog");
@@ -35,6 +38,10 @@
   const successRecipeTemperature = document.querySelector(
     "#success-recipe-temperature"
   );
+  const recipeNameInput = document.querySelector("#recipe-name");
+  const recipeNotesInput = document.querySelector("#recipe-notes");
+  const newRecipeSubmitButton =
+    newRecipeForm?.querySelector('button[type="submit"]') ?? null;
   const recipeDetailDialog = document.querySelector("#recipe-detail-dialog");
   const recipeDetailTitle =
     recipeDetailDialog?.querySelector(".recipe-detail__title") ?? null;
@@ -78,6 +85,10 @@
     recipeDetailDialog?.querySelector("#recipe-evaluation-feedback") ?? null;
   const recipeDetailDeleteButton =
     recipeDetailDialog?.querySelector(".recipe-detail__delete") ?? null;
+  const recipeDetailEditButton =
+    recipeDetailDialog?.querySelector(".recipe-detail__edit") ?? null;
+  const recipeDetailDuplicateButton =
+    recipeDetailDialog?.querySelector(".recipe-detail__duplicate") ?? null;
   const recipeDetailCloseButtons = recipeDetailDialog
     ? Array.from(recipeDetailDialog.querySelectorAll("[data-close-dialog]"))
     : [];
@@ -185,6 +196,905 @@
   );
   const otherRecipeCancelButton =
     otherRecipeForm?.querySelector(".other-recipe-cancel") ?? null;
+  const otherRecipeSubmitButton =
+    otherRecipeForm?.querySelector('button[type="submit"]') ?? null;
+  const languageSelector = document.querySelector("#language-switcher");
+
+  const translationsToEn = new Map();
+  const translationsToPt = new Map();
+  const translatableAttributes = ["placeholder", "aria-label", "title"];
+
+  function normalizeKey(value) {
+    return value ? value.replace(/\s+/g, " ").trim() : "";
+  }
+
+  function registerTranslations(entries) {
+    entries.forEach(([pt, en]) => {
+      const ptKey = normalizeKey(pt);
+      const enKey = normalizeKey(en);
+      translationsToEn.set(ptKey, en);
+      translationsToPt.set(enKey, pt);
+    });
+  }
+
+  function applyReplacements(text, replacements = {}) {
+    return Object.entries(replacements).reduce((acc, [key, value]) => {
+      const pattern = new RegExp(`{{\\s*${key}\\s*}}`, "g");
+      return acc.replace(pattern, value);
+    }, text);
+  }
+
+  function translateValue(value, locale) {
+    const key = normalizeKey(value);
+    if (!key) return null;
+    if (locale === "en") {
+      return translationsToEn.get(key) ?? null;
+    }
+    if (locale === "pt") {
+      return translationsToPt.get(key) ?? null;
+    }
+    return null;
+  }
+
+  function translateAttributesInRoot(root, locale) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    const selector = translatableAttributes
+      .map((attr) => `[${attr}]`)
+      .join(",");
+    const elements = root.querySelectorAll(selector);
+    elements.forEach((element) => {
+      translatableAttributes.forEach((attribute) => {
+        if (!element.hasAttribute(attribute)) return;
+        const currentValue = element.getAttribute(attribute) ?? "";
+        const translated = translateValue(currentValue, locale);
+        if (translated && translated !== currentValue) {
+          element.setAttribute(attribute, translated);
+        }
+      });
+    });
+  }
+
+  function translateAttributes(locale) {
+    translateAttributesInRoot(document, locale);
+    const templates = document.querySelectorAll("template");
+    templates.forEach((template) => {
+      translateAttributesInRoot(template.content, locale);
+    });
+  }
+
+  function translateNodeTree(root, locale) {
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      const raw = node.nodeValue ?? "";
+      const trimmed = raw.trim();
+      if (trimmed) {
+        const leading = raw.match(/^\s*/)?.[0] ?? "";
+        const trailing = raw.match(/\s*$/)?.[0] ?? "";
+        const translation = translateValue(trimmed, locale);
+        if (translation && translation !== trimmed) {
+          node.nodeValue = `${leading}${translation}${trailing}`;
+        }
+      }
+      node = walker.nextNode();
+    }
+  }
+
+  function translateTextNodes(locale) {
+    translateNodeTree(document.body, locale);
+    const templates = document.querySelectorAll("template");
+    templates.forEach((template) => {
+      translateNodeTree(template.content, locale);
+    });
+  }
+
+  function updateDocumentLanguage(locale) {
+    const lang = locale === "en" ? "en" : "pt-BR";
+    if (document.documentElement.lang !== lang) {
+      document.documentElement.lang = lang;
+    }
+  }
+
+  function translateStaticContent(locale) {
+    translateTextNodes(locale);
+    translateAttributes(locale);
+  }
+
+  function loadInitialLocale() {
+    try {
+      const stored = localStorage.getItem(localeStorageKey);
+      if (stored && supportedLocales.includes(stored)) {
+        return stored;
+      }
+    } catch (err) {
+      console.warn("Falha ao carregar idioma salvo:", err);
+    }
+    return defaultLocale;
+  }
+
+  function saveLocale(locale) {
+    try {
+      localStorage.setItem(localeStorageKey, locale);
+    } catch (err) {
+      console.warn("Falha ao salvar idioma:", err);
+    }
+  }
+
+  let currentLocale = loadInitialLocale();
+
+  function t(source, replacements = {}) {
+    const key = normalizeKey(source);
+    const template =
+      currentLocale === "pt"
+        ? source
+        : translationsToEn.get(key) ?? source;
+    return applyReplacements(template, replacements);
+  }
+
+  function applyLocale(locale, { persist = true } = {}) {
+    if (!supportedLocales.includes(locale)) return;
+    currentLocale = locale;
+    updateDocumentLanguage(locale);
+    translateStaticContent(locale);
+    if (languageSelector && languageSelector.value !== locale) {
+      languageSelector.value = locale;
+    }
+    if (persist) {
+      saveLocale(locale);
+    }
+  }
+
+  registerTranslations([
+    ["%", "%"],
+    [
+      "% = clamp(0,01, 1, (base(tempo) × fator_método × 2^((T_ref − T_efetiva)/6)) + ajuste_hidratação)",
+      "% = clamp(0.01, 1, (base(time) × method_factor × 2^((T_ref − T_effective)/6)) + hydration_adjustment)",
+    ],
+    [").", ")."],
+    ["+ Adicionar farinha", "+ Add flour"],
+    ["+ Registrar outras receitas", "+ Register other recipes"],
+    [".", "."],
+    ["00, 0, integral, importada...", "00, 0, whole, imported..."],
+    ["1. Cadastrar nova receita", "1. Register new recipe"],
+    ["1. Objetivo da massa", "1. Dough goal"],
+    ["11% a 12,5%", "11% to 12.5%"],
+    ["12 h → 0,200%", "12 h → 0.200%"],
+    ["18 h → 0,120%", "18 h → 0.120%"],
+    ["2. Farinhas disponíveis", "2. Available flours"],
+    ["2. Receitas registradas", "2. Saved recipes"],
+    ["24 h → 0,080%", "24 h → 0.080%"],
+    ["260 a 300", "260 to 300"],
+    ["3. Fermentação e Formulação", "3. Fermentation & Formula"],
+    ["300 a 350", "300 to 350"],
+    ["36 h → 0,055%", "36 h → 0.055%"],
+    ["4. Toques finais", "4. Final touches"],
+    ["48 h → 0,045%", "48 h → 0.045%"],
+    ["6 h → 0,350%", "6 h → 0.350%"],
+    [
+      ": Direta 1,00 · Biga 0,60 · Poolish 0,70.",
+      ": Direct 1.00 · Biga 0.60 · Poolish 0.70.",
+    ],
+    [
+      ": avalie farinha, temperatura local e rotina antes de finalizar a receita.",
+      ": assess flour, local temperature, and routine before finishing the recipe.",
+    ],
+    ["< 6 h → 0,500%", "< 6 h → 0.500%"],
+    [
+      "= clamp(-0,05, 0,05, (hidratação − 60) × 0,002).",
+      "= clamp(-0.05, 0.05, (hydration − 60) × 0.002).",
+    ],
+    ["A sugestão é um ponto de partida", "The suggestion is a starting point"],
+    ['Abrir "Minhas Farinhas"', 'Open "My Flours"'],
+    ["Absorção de água", "Water absorption"],
+    ["Absorção de água (%)", "Water absorption (%)"],
+    ["Acima de 12,5%", "Above 12.5%"],
+    ["Acima de 350", "Above 350"],
+    ["Anotações", "Notes"],
+    ["Anote comportamento, blends ou lotes.", "Record behavior, blends, or batches."],
+    [
+      "Anote racionais, tempos e ajustes que foram necessários",
+      "Write down rationale, timings, and adjustments you needed",
+    ],
+    ["Apagar", "Delete"],
+    ["Apagar receita", "Delete recipe"],
+    ["Aqui vão os principais detalhes da sua pizza:", "Here are the main details of your pizza:"],
+    ["Até 11%", "Up to 11%"],
+    ["Até 260", "Up to 260"],
+    ["Avaliar", "Evaluate"],
+    ["Avaliações", "Ratings"],
+    ["Açúcares", "Sugars"],
+    ["Backup de dados", "Data backup"],
+    ["Biga", "Biga"],
+    ["Blend de farinhas", "Flour blend"],
+    ["Cadastrar receita", "Add recipe"],
+    ["Calculado", "Calculated"],
+    ["Calcular uma sugestão de fermento", "Calculate a yeast suggestion"],
+    ["Cancelar", "Cancel"],
+    [
+      "Catalogue suas farinhas, filtros rápidos e detalhes técnicos.",
+      "Catalog your flours with quick filters and technical details.",
+    ],
+    ["Categoria", "Category"],
+    ["Comentários", "Comments"],
+    ["Como calculamos?", "How do we calculate it?"],
+    [
+      "Construa a sua receita: defina o estilo, escolha a farinha, planeje a fermentação e receba no final a fórmula de padeiro.",
+      "Build your recipe: set the style, choose the flour, plan the fermentation, and receive the baker's formula at the end.",
+    ],
+    ["Cópia de {{name}}", "Copy of {{name}}"],
+    ["Data de validade (opcional)", "Expiration date (optional)"],
+    [
+      "Defina estratégia, pré-fermento e parâmetros principais da massa. A fórmula de padeiro será atualizada automaticamente.",
+      "Define strategy, preferment, and main dough parameters. The baker's percentages will update automatically.",
+    ],
+    ["Descreva o estilo desejado", "Describe the desired style"],
+    ["Direta", "Direct"],
+    ["Duplicar", "Duplicate"],
+    ["Duplicar receita", "Duplicate recipe"],
+    ["Editar", "Edit"],
+    ["Editar receita", "Edit recipe"],
+    ["Entendi", "Got it"],
+    ["Estilo", "Style"],
+    ["Ex: 0.6", "Ex: 0.6"],
+    ["Ex: 12.5", "Ex: 12.5"],
+    ["Ex: 16", "Ex: 16"],
+    ["Ex: 2", "Ex: 2"],
+    ["Ex: 2.5", "Ex: 2.5"],
+    ["Ex: 20", "Ex: 20"],
+    ["Ex: 24", "Ex: 24"],
+    ["Ex: 3", "Ex: 3"],
+    ["Ex: 320", "Ex: 320"],
+    ["Ex: 4", "Ex: 4"],
+    ["Ex: 50", "Ex: 50"],
+    ["Ex: 6", "Ex: 6"],
+    ["Ex: 62", "Ex: 62"],
+    ["Ex: 65", "Ex: 65"],
+    ["Ex: Caputo Nuvola Super", "Ex: Caputo Nuvola Super"],
+    ["Ex: Molho de tomate da casa", "Ex: Homemade tomato sauce"],
+    ["Ex: Napoletana 70% biga", "Ex: Neapolitan 70% biga"],
+    ["Exportar dados", "Export data"],
+    [
+      "Exporte suas receitas e importe novamente em outro navegador.",
+      "Export your recipes and import them again in another browser.",
+    ],
+    ["Farinha", "Flour"],
+    ["Farinha do blend", "Blend flour"],
+    ["Fechar", "Close"],
+    ["Fermentação", "Fermentation"],
+    ["Fermento (gramas)", "Yeast (grams)"],
+    ["Focaccia", "Focaccia"],
+    ["Força W", "Strength W"],
+    ["Fórmula de padeiro", "Baker's formula"],
+    ["Gordura", "Fat"],
+    ["Hidratação", "Hydration"],
+    ["Hidratação final desejada", "Desired final hydration"],
+    ["Importar dados", "Import data"],
+    ["Informar manualmente", "Enter manually"],
+    [
+      "Informe a inoculação (quanto da farinha total vai para o pré-fermento) e a hidratação desejada.",
+      "Enter the inoculation (how much of the total flour goes into the preferment) and the desired hydration.",
+    ],
+    [
+      "Informe as temperaturas reais usadas na fermentação para melhorar o cálculo do fermento.",
+      "Enter the actual fermentation temperatures to improve the yeast calculation.",
+    ],
+    ["Inoculação", "Inoculation"],
+    ["Jornadas das receitas", "Recipe journeys"],
+    ["Limpar", "Clear"],
+    ["Limpar filtros", "Clear filters"],
+    [
+      "Liste ingredientes, proporções ou observações importantes.",
+      "List ingredients, ratios, or important notes.",
+    ],
+    ["Lógica completa da sugestão automática", "Full logic of the automatic suggestion"],
+    ["Massa total", "Total dough"],
+    ["Massas cadastradas", "Saved doughs"],
+    ["Maturação do pré-fermento", "Preferment maturation"],
+    ["Minhas Farinhas", "My Flours"],
+    ["Mista (TA + TC)", "Mixed (RT + CT)"],
+    ["Moagem", "Milling"],
+    ["Molho", "Sauce"],
+    [
+      "Monte o blend de farinhas que fará parte da massa. A soma dos percentuais deve resultar em 100%.",
+      "Build the flour blend that will be part of the dough. The percentages must add up to 100%.",
+    ],
+    ["MyPizzas", "MyPizzas"],
+    ["Método", "Method"],
+    ["Napoletana", "Neapolitan"],
+    ["Nenhuma farinha cadastrada ainda.", "No flours saved yet."],
+    ["Nenhuma outra receita cadastrada ainda.", "No other recipes saved yet."],
+    ["Nenhuma receita cadastrada ainda.", "No recipes saved yet."],
+    ["Nome", "Name"],
+    ["Nome comercial", "Brand name"],
+    ["Nome da farinha", "Flour name"],
+    ["Nome da farinha personalizada", "Custom flour name"],
+    ["Nome da receita", "Recipe name"],
+    ["Nota (0-10)", "Score (0-10)"],
+    ["Notas", "Notes"],
+    ["Notas ou observações", "Notes or observations"],
+    ["Nova Farinha", "New Flour"],
+    ["O que deu certo? O que pode melhorar?", "What went well? What can improve?"],
+    [
+      "O restante do tempo será considerado em temperatura controlada.",
+      "The remaining time will be considered under controlled temperature.",
+    ],
+    ["Obrigatório", "Required"],
+    ["Observações", "Observations"],
+    ["Opcional", "Optional"],
+    ["Outra receita", "Another recipe"],
+    ["Outras receitas", "Other recipes"],
+    ["Outro estilo", "Other style"],
+    ["P/L", "P/L"],
+    ["Pedra, cilindro, industrial...", "Stone, roller, industrial..."],
+    ["Percentual da farinha", "Flour percentage"],
+    ["Percentual sobre a farinha total.", "Percentage of total flour."],
+    ["Peso alvo de cada massa", "Target weight per dough"],
+    ["Pinsa romana", "Roman pinsa"],
+    ["Pizza New York", "New York pizza"],
+    ["Pizza al taglio", "Pizza al taglio"],
+    ["Poolish", "Poolish"],
+    ["Por fim, convertemos para peso:", "Finally, we convert to weight:"],
+    ["Precisa cadastrar uma nova farinha?", "Need to register a new flour?"],
+    ["Proteína", "Protein"],
+    ["Proteína %", "Protein %"],
+    ["Proteína (%)", "Protein (%)"],
+    ["Pré-fermento", "Preferment"],
+    ["Qual estilo?", "Which style?"],
+    ["Qual será o estilo da sua pizza", "What will be your pizza style"],
+    ["Quantas massas você precisa?", "How many dough balls do you need?"],
+    ["Receita salva com sucesso!", "Recipe saved successfully!"],
+    ["Receitas registradas", "Saved recipes"],
+    ["Recheio", "Filling"],
+    ["Registrar avaliação", "Save rating"],
+    [
+      "Registre também molhos, coberturas e o que mais achar relevante.",
+      "Also log sauces, toppings, and anything else that's relevant.",
+    ],
+    [
+      "Registre, avalie e consulte suas pizzas favoritas.",
+      "Record, rate, and review your favorite pizzas.",
+    ],
+    ["Remover", "Remove"],
+    ["Remover farinha", "Remove flour"],
+    [
+      "Resultado em fermento biológico seco instantâneo. Para fresco use 1 g seco ⇒ 3 g fresco.",
+      "Result in instant dry yeast. For fresh yeast use 1 g dry ⇒ 3 g fresh.",
+    ],
+    ["Resumo", "Summary"],
+    ["Sal", "Salt"],
+    ["Salvar Receita", "Save Recipe"],
+    ["Salvar avaliação", "Save rating"],
+    ["Salvar farinha", "Save flour"],
+    ["Salvar receita", "Save recipe"],
+    ["Selecione", "Select"],
+    ["Selecione o estilo", "Select the style"],
+    ["Selecione o método", "Select the method"],
+    ["Sugestão desatualizada — recalcular.", "Suggestion outdated — recalculate."],
+    ["T_efetiva", "T_effective"],
+    ["T_ref", "T_ref"],
+    ["Temperatura", "Temperature"],
+    ["Temperatura ambiente (TA)", "Room temperature (RT)"],
+    ["Temperatura ambiente média", "Average room temperature"],
+    ["Temperatura controlada (TC)", "Controlled temperature (CT)"],
+    ["Temperatura da fermentação", "Fermentation temperature"],
+    ["Temperatura da geladeira", "Fridge temperature"],
+    ["Temperaturas de referência", "Reference temperatures"],
+    ["Tempo em temperatura ambiente", "Time at room temperature"],
+    ["Tempo total", "Total time"],
+    ["Tempo total de fermentação da massa", "Total dough fermentation time"],
+    ["Tipo", "Type"],
+    ["Tipo de pré-fermento", "Preferment type"],
+    ["Todas", "All"],
+    ["Todos os tipos", "All types"],
+    ["Total: 0%", "Total: 0%"],
+    ["Usamos 260 g como ponto de partida.", "We use 260 g as a starting point."],
+    ["Validade", "Expiration"],
+    ["Ver detalhes", "See details"],
+    ["ajuste_hidratação", "hydration_adjustment"],
+    ["base(tempo)", "base(time)"],
+    [
+      "com base no tempo em TA/TC informado. Cada variação de 6 °C dobra ou reduz a atividade (fator 2",
+      "based on the time at RT/CT informed. Every 6 °C variation doubles or halves activity (factor 2",
+    ],
+    ["e também exibimos", "and we also show"],
+    ["fator_método", "method_factor"],
+    ["g", "g"],
+    ["g/kg", "g/kg"],
+    ["gramas = (% ÷ 100) × farinha total", "grams = (% ÷ 100) × total flour"],
+    ["horas", "hours"],
+    ["usa 24 °C (TA) e 6 °C (TC). Calculamos", "uses 24 °C (RT) and 6 °C (CT). We calculate"],
+    ["°C", "°C"],
+    ["é obtida da tabela:", "is pulled from the table:"],
+    ["Δ/6", "Δ/6"],
+    ["—", "—"],
+    ["ℹ️", "ℹ️"],
+    ["✨ Quer adicionar mais detalhes técnicos?", "✨ Want to add more technical details?"],
+    ["➕ Nova Farinha", "➕ New Flour"],
+    ["🍕", "🍕"],
+    ["Adicione ao menos uma farinha ao blend.", "Add at least one flour to the blend."],
+    [
+      "Anote os detalhes da receita antes de salvar.",
+      "Write down the recipe details before saving.",
+    ],
+    [
+      "Backup exportado. Guarde o arquivo em um local seguro.",
+      "Backup exported. Store the file in a safe place.",
+    ],
+    [
+      "Dados importados com sucesso!",
+      "Data imported successfully!",
+    ],
+    ["Descreva o estilo desejado.", "Describe the desired style."],
+    [
+      "Erro ao ler a imagem selecionada.",
+      "Error while reading the selected image.",
+    ],
+    [
+      "Importar este arquivo vai substituir todas as receitas e farinhas atuais. Deseja continuar?",
+      "Importing this file will replace all current recipes and flours. Do you want to continue?",
+    ],
+    [
+      "Informe a quantidade de fermento em gramas (valor positivo).",
+      "Enter the amount of yeast in grams (positive value).",
+    ],
+    [
+      "Informe a quantidade total de farinha (em gramas).",
+      "Enter the total flour amount (in grams).",
+    ],
+    [
+      "Informe a temperatura da geladeira (°C).",
+      "Enter the fridge temperature (°C).",
+    ],
+    [
+      "Informe o nome da farinha personalizada no blend.",
+      "Enter the custom flour name in the blend.",
+    ],
+    [
+      "Informe o percentual de cada farinha utilizada.",
+      "Enter the percentage for each flour used.",
+    ],
+    [
+      "Informe o percentual de sal.",
+      "Enter the salt percentage.",
+    ],
+    [
+      "Informe o peso alvo de cada massa (valor maior que zero).",
+      "Enter the target weight for each dough (value greater than zero).",
+    ],
+    [
+      "Informe o tempo em temperatura ambiente (maior que 0 e menor que o tempo total).",
+      "Enter the time at room temperature (greater than 0 and less than the total time).",
+    ],
+    [
+      "Informe o tipo da farinha (00, integral, importada...).",
+      "Enter the flour type (00, whole, imported...).",
+    ],
+    [
+      "Informe um nome para identificar a receita.",
+      "Provide a name to identify the recipe.",
+    ],
+    [
+      "Nenhum detalhe registrado ainda.",
+      "No details recorded yet.",
+    ],
+    [
+      "Nenhuma farinha encontrada para os filtros selecionados.",
+      "No flours found for the selected filters.",
+    ],
+    [
+      "O arquivo excede o limite de 2MB. Verifique se selecionou o backup correto.",
+      "The file exceeds the 2MB limit. Make sure you selected the correct backup.",
+    ],
+    [
+      "O percentual de gordura deve estar entre 0% e 25%.",
+      "The fat percentage must be between 0% and 25%.",
+    ],
+    [
+      "O percentual de sal deve estar entre 0% e 15%.",
+      "The salt percentage must be between 0% and 15%.",
+    ],
+    [
+      "O tempo em temperatura controlada precisa ser maior que zero.",
+      "The time at controlled temperature must be greater than zero.",
+    ],
+    [
+      "O valor de P/L deve ser positivo.",
+      "The P/L value must be positive.",
+    ],
+    [
+      "Os percentuais das farinhas precisam somar 100%. Ajuste o blend antes de continuar.",
+      "The flour percentages need to add up to 100%. Adjust the blend before continuing.",
+    ],
+    [
+      "Receita não encontrada. Atualize a página e tente novamente.",
+      "Recipe not found. Refresh the page and try again.",
+    ],
+    [
+      'Receita "{{name}}" atualizada.',
+      'Recipe "{{name}}" updated.',
+    ],
+    [
+      "Receita registrada.",
+      "Recipe saved.",
+    ],
+    [
+      "Selecione a farinha em cada linha do blend.",
+      "Select the flour in each blend row.",
+    ],
+    [
+      "Selecione um arquivo de imagem válido.",
+      "Select a valid image file.",
+    ],
+    [
+      "Selecione o método de fermentação para sugerir o fermento.",
+      "Choose the fermentation method to suggest the yeast amount.",
+    ],
+    [
+      "Selecione o método de fermentação.",
+      "Select the fermentation method.",
+    ],
+    [
+      "Selecione uma receita para registrar a avaliação.",
+      "Select a recipe to save the rating.",
+    ],
+    [
+      "Sem anotações registradas.",
+      "No notes recorded.",
+    ],
+    [
+      "Sem avaliações registradas.",
+      "No ratings recorded.",
+    ],
+    [
+      "Sem dados de formulação.",
+      "No formula data.",
+    ],
+    [
+      "Sem informações adicionais",
+      "No additional information",
+    ],
+    [
+      "Sem pré-fermento",
+      "No preferment",
+    ],
+    [
+      "Tempo não informado",
+      "Time not provided",
+    ],
+    [
+      "Nenhum dado disponível.",
+      "No data available.",
+    ],
+    [
+      "Dialog API não suportada:",
+      "Dialog API not supported:",
+    ],
+    [
+      "Salvar alterações",
+      "Save changes",
+    ],
+    [
+      "Não foi possível salvar a alteração. Verifique o espaço disponível e tente novamente.",
+      "Unable to save the change. Check the available space and try again.",
+    ],
+    [
+      "Não foi possível salvar a farinha. Verifique o espaço disponível e tente novamente.",
+      "Unable to save the flour. Check the available space and try again.",
+    ],
+    [
+      "Farinha não encontrada. Tente novamente.",
+      "Flour not found. Try again.",
+    ],
+    [
+      "Importação cancelada.",
+      "Import cancelled.",
+    ],
+    [
+      "Importação não disponível neste navegador.",
+      "Import not available in this browser.",
+    ],
+    [
+      "Não foi possível ler o arquivo selecionado.",
+      "Could not read the selected file.",
+    ],
+    [
+      "Arquivo inválido. Verifique se você selecionou um backup exportado pelo Pizza App.",
+      "Invalid file. Make sure you selected a backup exported by Pizza App.",
+    ],
+    [
+      "Falha ao ler arquivo de importação.",
+      "Failed to read the import file.",
+    ],
+    [
+      "Não foi possível ler o arquivo selecionado. Tente novamente.",
+      "Could not read the selected file. Please try again.",
+    ],
+    [
+      "Não foi possível exportar os dados. Tente novamente.",
+      "Unable to export data. Please try again.",
+    ],
+    [
+      "Não foi possível carregar a imagem selecionada.",
+      "Could not load the selected image.",
+    ],
+    [
+      "Não foi possível calcular a sugestão de fermento.",
+      "Unable to calculate the yeast suggestion.",
+    ],
+    [
+      "Não encontramos uma das farinhas selecionadas. Atualize a página e tente novamente.",
+      "We couldn't find one of the selected flours. Refresh the page and try again.",
+    ],
+    [
+      "Dê um nome para identificar a farinha.",
+      "Give the flour a name for identification.",
+    ],
+    [
+      "Dê um nome para sua receita antes de salvar.",
+      "Give your recipe a name before saving.",
+    ],
+    [
+      "Informe a temperatura da fermentação.",
+      "Enter the fermentation temperature.",
+    ],
+    [
+      "Informe quantas massas você precisa (valor maior que zero).",
+      "Enter how many dough balls you need (value greater than zero).",
+    ],
+    [
+      "Informe a temperatura da fermentação para sugerir o fermento.",
+      "Enter the fermentation temperature to suggest the yeast amount.",
+    ],
+    [
+      "Informe a temperatura da fermentação para sugerir o fermento.",
+      "Enter the fermentation temperature to suggest the yeast amount.",
+    ],
+    [
+      "Informe a temperatura ambiente média (°C).",
+      "Enter the average room temperature (°C).",
+    ],
+    [
+      "Informe a hidratação final desejada para sugerir o fermento.",
+      "Enter the desired final hydration to suggest the yeast amount.",
+    ],
+    [
+      "Informe o tempo total de fermentação (valor maior que zero).",
+      "Enter the total fermentation time (value greater than zero).",
+    ],
+    [
+      "Informe uma nota válida entre 0 e 10.",
+      "Enter a valid score between 0 and 10.",
+    ],
+    [
+      "Receita não encontrada. Atualize a página e tente novamente.",
+      "Recipe not found. Refresh the page and try again.",
+    ],
+    [
+      "Avaliações estão disponíveis apenas para receitas de massa.",
+      "Ratings are only available for dough recipes.",
+    ],
+    [
+      "A farinha total precisa ser calculada antes da sugestão.",
+      "Total flour needs to be calculated before suggesting yeast.",
+    ],
+    [
+      "A hidratação deve ser maior que 0%.",
+      "Hydration must be greater than 0%.",
+    ],
+    [
+      "A hidratação final desejada para sugerir o fermento.",
+      "Desired final hydration to suggest the yeast amount.",
+    ],
+    [
+      "A inoculação do pré-fermento deve representar menos que 100% da farinha total.",
+      "The preferment inoculation must be less than 100% of the total flour.",
+    ],
+    [
+      "A água do pré-fermento excede a água total da massa. Ajuste os valores.",
+      "Preferment water exceeds the dough's total water. Adjust the values.",
+    ],
+    [
+      "Pré-visualização da foto da pizza",
+      "Preview of the pizza photo",
+    ],
+    [
+      "Pré-visualização da pizza",
+      "Pizza preview",
+    ],
+    [
+      "Criação não informada",
+      "Creation date not provided",
+    ],
+    [
+      "⭐ Sem avaliações",
+      "⭐ No ratings yet",
+    ],
+    [
+      "avaliação",
+      "rating",
+    ],
+    [
+      "avaliações",
+      "ratings",
+    ],
+    [
+      "Fermentação",
+      "Fermentation",
+    ],
+    [
+      "Hidratação",
+      "Hydration",
+    ],
+    [
+      "Receita sem nome",
+      "Untitled recipe",
+    ],
+    [
+      "Farinha sem nome",
+      "Unnamed flour",
+    ],
+    [
+      'Farinha "{{name}}" atualizada.',
+      'Flour "{{name}}" updated.',
+    ],
+    [
+      'Farinha "{{name}}" cadastrada.',
+      'Flour "{{name}}" added.',
+    ],
+    [
+      'Farinha "{{name}}" removida.',
+      'Flour "{{name}}" removed.',
+    ],
+    [
+      'Receita "{{name}}" removida.',
+      'Recipe "{{name}}" removed.',
+    ],
+    [
+      'Receita "{{name}}" registrada.',
+      'Recipe "{{name}}" saved.',
+    ],
+    [
+      'Apagar "{{name}}"? Essa ação não pode ser desfeita.',
+      'Delete "{{name}}"? This action cannot be undone.',
+    ],
+    [
+      'Apagar a farinha "{{name}}"?',
+      'Delete the flour "{{name}}"?',
+    ],
+    [
+      'Avaliação registrada para "{{name}}".',
+      'Rating saved for "{{name}}".',
+    ],
+    [
+      "Farinha total: {{value}}",
+      "Total flour: {{value}}",
+    ],
+    [
+      "Água: {{value}}",
+      "Water: {{value}}",
+    ],
+    [
+      "Sal: {{value}}",
+      "Salt: {{value}}",
+    ],
+    [
+      "Fermento: {{value}}",
+      "Yeast: {{value}}",
+    ],
+    [
+      "Gordura: {{value}}",
+      "Fat: {{value}}",
+    ],
+    [
+      "Açúcares: {{value}}",
+      "Sugars: {{value}}",
+    ],
+    [
+      "Hidratação {{value}}",
+      "Hydration {{value}}",
+    ],
+    [
+      "Nota média {{average}} ({{count}} {{suffix}})",
+      "Average score {{average}} ({{count}} {{suffix}})",
+    ],
+    [
+      "⭐ Nota média {{average}} ({{count}} {{suffix}})",
+      "⭐ Average score {{average}} ({{count}} {{suffix}})",
+    ],
+    [
+      "farinha {{value}}",
+      "flour {{value}}",
+    ],
+    [
+      "água {{value}}",
+      "water {{value}}",
+    ],
+    [
+      "Massa final (antes dos demais ingredientes): {{mix}}",
+      "Final dough (before other ingredients): {{mix}}",
+    ],
+    [
+      "Pré-fermento: {{value}}{{breakdown}}{{details}}",
+      "Preferment: {{value}}{{breakdown}}{{details}}",
+    ],
+    [
+      "{{value}}% da farinha total",
+      "{{value}}% of total flour",
+    ],
+    [
+      "{{value}}% inoc.",
+      "{{value}}% inoc.",
+    ],
+    [
+      "{{value}}% hidr.",
+      "{{value}}% hydr.",
+    ],
+    [
+      "{{value}}h maturação",
+      "{{value}}h maturation",
+    ],
+    [
+      "Massas: {{count}} × {{weight}}",
+      "Doughs: {{count}} × {{weight}}",
+    ],
+    [
+      "Massas: {{count}} × {{weight}} = {{total}}",
+      "Doughs: {{count}} × {{weight}} = {{total}}",
+    ],
+    [
+      "Massa total estimada: {{value}}",
+      "Estimated total dough: {{value}}",
+    ],
+    [
+      "Criada em {{date}}",
+      "Created on {{date}}",
+    ],
+    [
+      "Cadastrada em {{date}}",
+      "Registered on {{date}}",
+    ],
+    [
+      "Atualizada em {{date}}",
+      "Updated on {{date}}",
+    ],
+    [
+      "Estilo {{style}}",
+      "Style {{style}}",
+    ],
+    [
+      "Pizza {{name}}",
+      "Pizza {{name}}",
+    ],
+    [
+      "{{value}} g por kg",
+      "{{value}} g per kg",
+    ],
+    [
+      "Pré-fermento configurado",
+      "Preferment configured",
+    ],
+    [
+      "Ocultar formulário",
+      "Hide form",
+    ],
+    [
+      "Idioma",
+      "Language",
+    ],
+    [
+      "Selecione o idioma",
+      "Select language",
+    ],
+    [
+      "Português",
+      "Portuguese",
+    ],
+    [
+      "Inglês",
+      "English",
+    ],
+  ]);
   const dataExportButton = document.querySelector("#data-export");
   const dataImportButton = document.querySelector("#data-import");
   const dataImportInput = document.querySelector("#data-import-input");
@@ -200,6 +1110,8 @@
       protein: "all",
       strength: "all",
     },
+    editingRecipeId: null,
+    editingOtherRecipeId: null,
     editingFlourId: null,
     flourBlendCounter: 0,
     yeastSuggestion: null,
@@ -347,7 +1259,8 @@
   function formatDate(isoString) {
     const date = new Date(isoString);
     if (Number.isNaN(date.getTime())) return "Data desconhecida";
-    return new Intl.DateTimeFormat("pt-BR", {
+    const locale = currentLocale === "en" ? "en-US" : "pt-BR";
+    return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(date);
@@ -394,10 +1307,6 @@
   const weightFormatter = new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 1,
-  });
-
-  const dateOnlyFormatter = new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "medium",
   });
 
   const flourStrengthRanges = {
@@ -480,13 +1389,89 @@
       });
     } else {
       otherRecipeForm.classList.add("is-hidden");
+      if (otherRecipeForm instanceof HTMLFormElement) {
+        otherRecipeForm.reset();
+      }
+      resetOtherRecipeFormMode();
+      setOtherRecipeFeedback("");
     }
     if (otherRecipeToggleButton) {
       otherRecipeToggleButton.textContent = shouldShow
-        ? "Ocultar formulário"
-        : "+ Registrar outras receitas";
+        ? t("Ocultar formulário")
+        : t("+ Registrar outras receitas");
       otherRecipeToggleButton.setAttribute("aria-expanded", String(shouldShow));
     }
+  }
+
+  function updateOtherRecipeFormMode(mode) {
+    if (!otherRecipeSubmitButton) return;
+    if (mode === "edit") {
+      otherRecipeSubmitButton.textContent = t("Salvar alterações");
+      otherRecipeSubmitButton.dataset.mode = "edit";
+    } else {
+      otherRecipeSubmitButton.textContent = t("Salvar receita");
+      otherRecipeSubmitButton.dataset.mode = "create";
+    }
+  }
+
+  function resetOtherRecipeFormMode() {
+    state.editingOtherRecipeId = null;
+    updateOtherRecipeFormMode("create");
+  }
+
+  function populateOtherRecipeForm(recipe, { duplicate = false } = {}) {
+    if (!otherRecipeForm || !recipe) return;
+    if (otherRecipeForm instanceof HTMLFormElement) {
+      otherRecipeForm.reset();
+    }
+
+    if (otherRecipeNameInput) {
+      if (duplicate && recipe.name) {
+        otherRecipeNameInput.value = t('Cópia de {{name}}', { name: recipe.name });
+      } else {
+        otherRecipeNameInput.value = recipe.name || "";
+      }
+    }
+
+    const normalizedType = normalizeRecipeType(recipe.type);
+    if (otherRecipeCategorySelect) {
+      if (normalizedType === "massa") {
+        otherRecipeCategorySelect.value = "outro";
+      } else {
+        otherRecipeCategorySelect.value = normalizedType;
+      }
+    }
+
+    if (otherRecipeContentInput) {
+      otherRecipeContentInput.value = recipe.content || recipe.notes || "";
+    }
+  }
+
+  function startOtherRecipeEdit(recipe) {
+    if (!recipe) return;
+    const normalizedType = normalizeRecipeType(recipe.type);
+    if (normalizedType === "massa") {
+      startRecipeEdit(recipe);
+      return;
+    }
+    state.editingOtherRecipeId = recipe.id;
+    updateOtherRecipeFormMode("edit");
+    switchTab("list");
+    toggleOtherRecipeForm(true);
+    populateOtherRecipeForm(recipe);
+  }
+
+  function startOtherRecipeDuplicate(recipe) {
+    if (!recipe) return;
+    const normalizedType = normalizeRecipeType(recipe.type);
+    if (normalizedType === "massa") {
+      startRecipeDuplicate(recipe);
+      return;
+    }
+    resetOtherRecipeFormMode();
+    switchTab("list");
+    toggleOtherRecipeForm(true);
+    populateOtherRecipeForm(recipe, { duplicate: true });
   }
 
   function nearlyEqual(a, b, tolerance = 0.01) {
@@ -580,7 +1565,8 @@
     if (!isoString) return "";
     const date = new Date(isoString);
     if (Number.isNaN(date.getTime())) return "";
-    return dateOnlyFormatter.format(date);
+    const locale = currentLocale === "en" ? "en-US" : "pt-BR";
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date);
   }
 
   function formatDecimal(value) {
@@ -1132,22 +2118,30 @@
     const totalFlour = parseNumeric(formulaTotalFlourInput?.value);
 
     if (!context.method) {
-      showFeedback("Selecione o método de fermentação para sugerir o fermento.");
+      showFeedback(
+        t("Selecione o método de fermentação para sugerir o fermento.")
+      );
       return;
     }
 
     if (!context.temperature) {
-      showFeedback("Informe a temperatura da fermentação para sugerir o fermento.");
+      showFeedback(
+        t("Informe a temperatura da fermentação para sugerir o fermento.")
+      );
       return;
     }
 
     if (context.time === null || context.time <= 0) {
-      showFeedback("Informe o tempo total de fermentação (valor maior que zero).");
+      showFeedback(
+        t("Informe o tempo total de fermentação (valor maior que zero).")
+      );
       return;
     }
 
     if (context.hydration === null || context.hydration <= 0) {
-      showFeedback("Informe a hidratação final desejada para sugerir o fermento.");
+      showFeedback(
+        t("Informe a hidratação final desejada para sugerir o fermento.")
+      );
       return;
     }
 
@@ -1164,7 +2158,7 @@
     switch (context.temperature) {
       case "TA": {
         if (ambientTempRaw === null || !Number.isFinite(ambientTempRaw)) {
-          showFeedback("Informe a temperatura ambiente média (°C).");
+          showFeedback(t("Informe a temperatura ambiente média (°C)."));
           return;
         }
         context.ambientTemp = ambientTempRaw;
@@ -1175,7 +2169,7 @@
       }
       case "TC": {
         if (controlledTempRaw === null || !Number.isFinite(controlledTempRaw)) {
-          showFeedback("Informe a temperatura da geladeira (°C).");
+          showFeedback(t("Informe a temperatura da geladeira (°C)."));
           return;
         }
         context.controlledTemp = controlledTempRaw;
@@ -1189,11 +2183,11 @@
       }
       case "Mista": {
         if (ambientTempRaw === null || !Number.isFinite(ambientTempRaw)) {
-          showFeedback("Informe a temperatura ambiente média (°C).");
+          showFeedback(t("Informe a temperatura ambiente média (°C)."));
           return;
         }
         if (controlledTempRaw === null || !Number.isFinite(controlledTempRaw)) {
-          showFeedback("Informe a temperatura da geladeira (°C).");
+          showFeedback(t("Informe a temperatura da geladeira (°C)."));
           return;
         }
         if (
@@ -1202,7 +2196,9 @@
           ambientDurationRaw >= context.time
         ) {
           showFeedback(
-            "Informe o tempo em temperatura ambiente (maior que 0 e menor que o tempo total)."
+            t(
+              "Informe o tempo em temperatura ambiente (maior que 0 e menor que o tempo total)."
+            )
           );
           return;
         }
@@ -1212,7 +2208,7 @@
         );
         if (controlledDuration <= 0) {
           showFeedback(
-            "O tempo em temperatura controlada precisa ser maior que zero."
+            t("O tempo em temperatura controlada precisa ser maior que zero.")
           );
           return;
         }
@@ -1223,19 +2219,23 @@
         break;
       }
       default: {
-        showFeedback("Informe a temperatura da fermentação para sugerir o fermento.");
+        showFeedback(
+          t("Informe a temperatura da fermentação para sugerir o fermento.")
+        );
         return;
       }
     }
 
     if (totalFlour === null || totalFlour <= 0) {
-      showFeedback("A farinha total precisa ser calculada antes da sugestão.");
+      showFeedback(
+        t("A farinha total precisa ser calculada antes da sugestão.")
+      );
       return;
     }
 
     const percentage = calculateYeastPercentage(context);
     if (percentage === null) {
-      showFeedback("Não foi possível calcular a sugestão de fermento.");
+      showFeedback(t("Não foi possível calcular a sugestão de fermento."));
       return;
     }
 
@@ -1653,6 +2653,8 @@
           <footer class="recipe-card__footer">
             <button type="button" class="recipe-card__evaluate">Avaliar</button>
             <button type="button" class="recipe-card__details">Ver detalhes</button>
+            <button type="button" class="recipe-card__edit ghost">Editar</button>
+            <button type="button" class="recipe-card__duplicate ghost">Duplicar</button>
             <button type="button" class="recipe-card__delete ghost">Apagar receita</button>
           </footer>
         `;
@@ -1666,8 +2668,8 @@
       const metaElement = article.querySelector(".recipe-card__meta");
       if (metaElement) {
         const createdLabel = recipe.createdAt
-          ? `Criada em ${formatDate(recipe.createdAt)}`
-          : "Criação não informada";
+          ? t("Criada em {{date}}", { date: formatDate(recipe.createdAt) })
+          : t("Criação não informada");
         metaElement.textContent = createdLabel;
       }
 
@@ -1676,10 +2678,14 @@
         const average = computeAverageScore(recipe.ratings);
         const count = recipe.ratings?.length ?? 0;
         if (!count) {
-          averageLabel.textContent = "⭐ Sem avaliações";
+          averageLabel.textContent = t("⭐ Sem avaliações");
         } else {
-          const suffix = count === 1 ? "avaliação" : "avaliações";
-          averageLabel.textContent = `⭐ Nota média ${average} (${count} ${suffix})`;
+          const suffix = count === 1 ? t("avaliação") : t("avaliações");
+          averageLabel.textContent = t("⭐ Nota média {{average}} ({{count}} {{suffix}})", {
+            average,
+            count,
+            suffix,
+          });
         }
       }
 
@@ -1751,6 +2757,16 @@
         detailsButton.addEventListener("click", () => openRecipeDetail(recipe));
       }
 
+      const editButton = article.querySelector(".recipe-card__edit");
+      if (editButton) {
+        editButton.addEventListener("click", () => startRecipeEdit(recipe));
+      }
+
+      const duplicateButton = article.querySelector(".recipe-card__duplicate");
+      if (duplicateButton) {
+        duplicateButton.addEventListener("click", () => startRecipeDuplicate(recipe));
+      }
+
       const deleteButton = article.querySelector(".recipe-card__delete");
       if (deleteButton) {
         deleteButton.addEventListener("click", () => handleRecipeDelete(recipe));
@@ -1796,6 +2812,8 @@
           </div>
           <footer class="recipe-card__footer">
             <button type="button" class="recipe-card__details">Ver detalhes</button>
+            <button type="button" class="recipe-card__edit ghost">Editar</button>
+            <button type="button" class="recipe-card__duplicate ghost">Duplicar</button>
             <button type="button" class="recipe-card__delete ghost">Apagar</button>
           </footer>
         `;
@@ -1813,12 +2831,15 @@
 
       const meta = article.querySelector(".recipe-card__meta");
       if (meta) {
-        const created = recipe.createdAt ? `Criada em ${formatDate(recipe.createdAt)}` : "";
+        const created = recipe.createdAt
+          ? t("Criada em {{date}}", { date: formatDate(recipe.createdAt) })
+          : "";
         const updated =
           recipe.updatedAt && recipe.updatedAt !== recipe.createdAt
-            ? `Atualizada em ${formatDate(recipe.updatedAt)}`
+            ? t("Atualizada em {{date}}", { date: formatDate(recipe.updatedAt) })
             : "";
-        meta.textContent = [created, updated].filter(Boolean).join(" • ");
+        const combined = [created, updated].filter(Boolean).join(" • ");
+        meta.textContent = combined || t("Criação não informada");
       }
 
       const averageLabel = article.querySelector(".recipe-card__average");
@@ -1830,12 +2851,24 @@
       const excerptElement = article.querySelector(".other-recipe-card__excerpt");
       if (excerptElement) {
         const excerpt = buildRecipeExcerpt(recipe.content || recipe.notes || "");
-        excerptElement.textContent = excerpt || "Sem anotações registradas.";
+        excerptElement.textContent = excerpt || t("Sem anotações registradas.");
       }
 
       const detailsButton = article.querySelector(".recipe-card__details");
       if (detailsButton) {
         detailsButton.addEventListener("click", () => openRecipeDetail(recipe));
+      }
+
+      const editButton = article.querySelector(".recipe-card__edit");
+      if (editButton) {
+        editButton.addEventListener("click", () => startOtherRecipeEdit(recipe));
+      }
+
+      const duplicateButton = article.querySelector(".recipe-card__duplicate");
+      if (duplicateButton) {
+        duplicateButton.addEventListener("click", () =>
+          startOtherRecipeDuplicate(recipe)
+        );
       }
 
       const deleteButton = article.querySelector(".recipe-card__delete");
@@ -1865,16 +2898,22 @@
     if (recipeDetailMeta) {
       const metaParts = [];
       if (recipe.createdAt) {
-        metaParts.push(`Criada em ${formatDate(recipe.createdAt)}`);
+        metaParts.push(t("Criada em {{date}}", { date: formatDate(recipe.createdAt) }));
       }
       if (details.style) {
-        metaParts.push(`Estilo ${details.style}`);
+        metaParts.push(t("Estilo {{style}}", { style: details.style }));
       }
       const average = computeAverageScore(ratings);
       if (average) {
         const count = ratings.length;
-        const suffix = count === 1 ? "avaliação" : "avaliações";
-        metaParts.push(`Nota média ${average} (${count} ${suffix})`);
+        const suffix = count === 1 ? t("avaliação") : t("avaliações");
+        metaParts.push(
+          t("Nota média {{average}} ({{count}} {{suffix}})", {
+            average,
+            count,
+            suffix,
+          })
+        );
       }
       recipeDetailMeta.textContent =
         metaParts.join(" • ") || "Sem informações adicionais";
@@ -2022,6 +3061,42 @@
       recipeDetailEvaluationFeedback.textContent = "";
     }
 
+    if (recipeDetailEditButton) {
+      const shouldShow = Boolean(recipe);
+      recipeDetailEditButton.classList.toggle("is-hidden", !shouldShow);
+      recipeDetailEditButton.toggleAttribute("hidden", !shouldShow);
+      if (shouldShow) {
+        recipeDetailEditButton.onclick = () => {
+          closeRecipeDetail();
+          if (isMassRecipe) {
+            startRecipeEdit(recipe);
+          } else {
+            startOtherRecipeEdit(recipe);
+          }
+        };
+      } else {
+        recipeDetailEditButton.onclick = null;
+      }
+    }
+
+    if (recipeDetailDuplicateButton) {
+      const shouldShow = Boolean(recipe);
+      recipeDetailDuplicateButton.classList.toggle("is-hidden", !shouldShow);
+      recipeDetailDuplicateButton.toggleAttribute("hidden", !shouldShow);
+      if (shouldShow) {
+        recipeDetailDuplicateButton.onclick = () => {
+          closeRecipeDetail();
+          if (isMassRecipe) {
+            startRecipeDuplicate(recipe);
+          } else {
+            startOtherRecipeDuplicate(recipe);
+          }
+        };
+      } else {
+        recipeDetailDuplicateButton.onclick = null;
+      }
+    }
+
     if (recipeDetailDeleteButton) {
       recipeDetailDeleteButton.onclick = () => handleRecipeDelete(recipe);
     }
@@ -2071,6 +3146,7 @@
         });
       }
     }
+    translateStaticContent(currentLocale);
   }
 
   function isFlourFilterActive() {
@@ -2207,8 +3283,8 @@
       const referenceDate = flour.updatedAt ?? flour.createdAt;
       if (referenceDate) {
         const label = flour.updatedAt
-          ? `Atualizada em ${formatDateOnly(referenceDate)}`
-          : `Cadastrada em ${formatDateOnly(referenceDate)}`;
+          ? t("Atualizada em {{date}}", { date: formatDateOnly(referenceDate) })
+          : t("Cadastrada em {{date}}", { date: formatDateOnly(referenceDate) });
         meta.textContent = label;
         meta.classList.remove("is-hidden");
       } else {
@@ -2402,32 +3478,32 @@
     const expirationRaw = (formData.get("flourExpiration") || "").toString().trim();
 
     if (!name) {
-      showFeedback("Dê um nome para identificar a farinha.");
+      showFeedback(t("Dê um nome para identificar a farinha."));
       return;
     }
 
     if (!type) {
-      showFeedback("Informe o tipo da farinha (00, integral, importada...).");
+      showFeedback(t("Informe o tipo da farinha (00, integral, importada...)."));
       return;
     }
 
     if (protein !== null && (protein < 0 || protein > 20)) {
-      showFeedback("Informe uma proteína válida entre 0% e 20%.");
+      showFeedback(t("Informe uma proteína válida entre 0% e 20%."));
       return;
     }
 
     if (strength !== null && strength < 0) {
-      showFeedback("A força W deve ser um valor positivo.");
+      showFeedback(t("A força W deve ser um valor positivo."));
       return;
     }
 
     if (pl !== null && pl < 0) {
-      showFeedback("O valor de P/L deve ser positivo.");
+      showFeedback(t("O valor de P/L deve ser positivo."));
       return;
     }
 
     if (absorption !== null && (absorption < 0 || absorption > 100)) {
-      showFeedback("A absorção deve estar entre 0% e 100%.");
+      showFeedback(t("A absorção deve estar entre 0% e 100%."));
       return;
     }
 
@@ -2435,7 +3511,7 @@
     if (expirationRaw) {
       const parsed = new Date(`${expirationRaw}T00:00:00`);
       if (Number.isNaN(parsed.getTime())) {
-        showFeedback("Informe uma data de validade válida.");
+        showFeedback(t("Informe uma data de validade válida."));
         return;
       }
       expirationDate = parsed.toISOString();
@@ -2447,7 +3523,7 @@
     if (isEditing) {
       const index = state.flours.findIndex((item) => item.id === state.editingFlourId);
       if (index === -1) {
-        showFeedback("Farinha não encontrada. Tente novamente.");
+        showFeedback(t("Farinha não encontrada. Tente novamente."));
         closeFlourForm();
         return;
       }
@@ -2471,7 +3547,7 @@
       updateAllBlendSelectOptions();
       updateBlendTotal();
       closeFlourForm();
-      showFeedback(`Farinha "${name}" atualizada.`);
+      showFeedback(t('Farinha "{{name}}" atualizada.', { name }));
       return;
     }
 
@@ -2497,7 +3573,7 @@
     updateAllBlendSelectOptions();
     updateBlendTotal();
     closeFlourForm();
-    showFeedback(`Farinha "${name}" cadastrada.`);
+  showFeedback(t('Farinha "{{name}}" cadastrada.', { name }));
   }
 
   function handleFlourFiltersChange(event) {
@@ -2526,7 +3602,7 @@
     if (!recipe || !recipe.id) return;
     const label = recipe.name || "Receita sem nome";
     const shouldRemove = window.confirm(
-      `Apagar "${label}"? Essa ação não pode ser desfeita.`
+      t('Apagar "{{name}}"? Essa ação não pode ser desfeita.', { name: label })
     );
     if (!shouldRemove) return;
 
@@ -2534,17 +3610,247 @@
       closeRecipeDetail();
     }
 
+    if (state.editingRecipeId === recipe.id) {
+      resetRecipeFormMode();
+    }
+
+    if (state.editingOtherRecipeId === recipe.id) {
+      resetOtherRecipeFormMode();
+      if (otherRecipeForm && !otherRecipeForm.classList.contains("is-hidden")) {
+        toggleOtherRecipeForm(false);
+      }
+    }
+
     state.recipes = state.recipes.filter((item) => item.id !== recipe.id);
     safeStorage.save(state.recipes);
     syncUI();
-    showFeedback(`Receita "${label}" removida.`);
+    showFeedback(t('Receita "{{name}}" removida.', { name: label }));
+  }
+
+  function updateRecipeFormMode(mode) {
+    if (!newRecipeSubmitButton) return;
+    if (mode === "edit") {
+      newRecipeSubmitButton.textContent = t("Salvar alterações");
+      newRecipeSubmitButton.dataset.mode = "edit";
+    } else {
+      newRecipeSubmitButton.textContent = t("Salvar Receita");
+      newRecipeSubmitButton.dataset.mode = "create";
+    }
+  }
+
+  function resetRecipeFormMode() {
+    state.editingRecipeId = null;
+    updateRecipeFormMode("create");
+    state.pendingPhoto = null;
+  }
+
+  function resolveStyleSelection(styleValue) {
+    if (!recipeStyleSelect) return { selectValue: "", customValue: "" };
+    const optionValues = Array.from(recipeStyleSelect.options || []).map(
+      (option) => option.value
+    );
+    if (optionValues.includes(styleValue)) {
+      return { selectValue: styleValue, customValue: "" };
+    }
+    return { selectValue: "Outro", customValue: styleValue };
+  }
+
+  function populateNewRecipeForm(recipe, { duplicate = false } = {}) {
+    if (!recipe || !newRecipeForm) return;
+
+    const resolvedStyle = resolveStyleSelection(recipe.styleCategory || recipe.style || "");
+
+    if (recipeNameInput) {
+      if (duplicate && recipe.name) {
+        recipeNameInput.value = t('Cópia de {{name}}', { name: recipe.name });
+      } else {
+        recipeNameInput.value = recipe.name || "";
+      }
+    }
+
+    if (recipeStyleSelect) {
+      recipeStyleSelect.value = resolvedStyle.selectValue;
+      handleRecipeStyleChange();
+    }
+
+    if (recipeStyleCustomInput) {
+      recipeStyleCustomInput.value = resolvedStyle.customValue;
+    }
+
+    if (recipeFermentationSelect) {
+      recipeFermentationSelect.value = recipe.fermentationMethod || "";
+      togglePrefermentSection(recipeFermentationSelect.value);
+    }
+
+    if (recipeFermentationTimeInput) {
+      recipeFermentationTimeInput.value =
+        recipe.fermentationTime !== null && recipe.fermentationTime !== undefined
+          ? String(recipe.fermentationTime)
+          : "";
+    }
+
+    if (recipeFermentationTempSelect) {
+      recipeFermentationTempSelect.value = recipe.fermentationTemperature || "";
+      updateFermentationTemperatureFields();
+    }
+
+    const tempDetails = recipe.fermentation?.temperatureDetails || recipe.temperatureDetails || null;
+    if (recipeFermentationAmbientTempInput) {
+      recipeFermentationAmbientTempInput.value = tempDetails?.ambient ?? "";
+    }
+    if (recipeFermentationControlledTempInput) {
+      recipeFermentationControlledTempInput.value = tempDetails?.controlled ?? "";
+    }
+    if (recipeFermentationAmbientDurationInput) {
+      recipeFermentationAmbientDurationInput.value =
+        tempDetails?.ambientDuration ?? "";
+    }
+
+    const formulation = recipe.formulation || {};
+    if (formulaDoughCountInput) {
+      formulaDoughCountInput.value =
+        formulation.doughCount !== null && formulation.doughCount !== undefined
+          ? String(formulation.doughCount)
+          : "";
+    }
+    if (formulaDoughWeightInput) {
+      formulaDoughWeightInput.value =
+        formulation.doughBallWeight !== null &&
+        formulation.doughBallWeight !== undefined
+          ? String(formulation.doughBallWeight)
+          : "";
+    }
+
+    const formula = recipe.formula || {};
+    if (formulaTotalFlourInput) {
+      if (formula.totalFlour !== null && formula.totalFlour !== undefined) {
+        formulaTotalFlourInput.value = String(formula.totalFlour);
+      } else {
+        formulaTotalFlourInput.value = "";
+      }
+      delete formulaTotalFlourInput.dataset.autoValue;
+    }
+
+    if (formulaWaterInput) {
+      const waterPct = formula.percentages?.water ?? recipe.hydration ?? "";
+      formulaWaterInput.value = waterPct !== null && waterPct !== undefined ? String(waterPct) : "";
+    }
+    if (formulaSaltInput) {
+      const saltPct = formula.percentages?.salt;
+      formulaSaltInput.value =
+        saltPct !== null && saltPct !== undefined ? String(saltPct) : "";
+    }
+    if (formulaYeastInput) {
+      const yeastValue = formula.totals?.yeast;
+      formulaYeastInput.value =
+        yeastValue !== null && yeastValue !== undefined ? String(yeastValue) : "";
+    }
+    if (formulaFatInput) {
+      const fatPct = formula.percentages?.fat;
+      formulaFatInput.value =
+        fatPct !== null && fatPct !== undefined ? String(fatPct) : "";
+    }
+    if (formulaSugarInput) {
+      const sugarPct = formula.percentages?.sugar;
+      formulaSugarInput.value =
+        sugarPct !== null && sugarPct !== undefined ? String(sugarPct) : "";
+    }
+
+    if (recipeNotesInput) {
+      recipeNotesInput.value = recipe.notes || recipe.content || "";
+    }
+
+    const preferment = recipe.preferment && recipe.preferment.enabled !== false ? recipe.preferment : null;
+    if (prefermentTypeSelect) {
+      prefermentTypeSelect.value = preferment?.type || "";
+    }
+    if (prefermentInoculationInput) {
+      prefermentInoculationInput.value =
+        preferment?.inoculation !== null && preferment?.inoculation !== undefined
+          ? String(preferment.inoculation)
+          : "";
+    }
+    if (prefermentHydrationInput) {
+      prefermentHydrationInput.value =
+        preferment?.hydration !== null && preferment?.hydration !== undefined
+          ? String(preferment.hydration)
+          : "";
+    }
+    if (prefermentMaturationInput) {
+      prefermentMaturationInput.value =
+        preferment?.maturation !== null && preferment?.maturation !== undefined
+          ? String(preferment.maturation)
+          : "";
+    }
+
+    const blendInitial = Array.isArray(recipe.flourBlend)
+      ? recipe.flourBlend.map((item) => ({
+          type: item.type,
+          selection:
+            item.type === "reference"
+              ? item.id
+              : item.type === "custom"
+              ? "custom"
+              : item.id || "",
+          name: item.name || "",
+          percentage:
+            item.percentage !== null && item.percentage !== undefined
+              ? item.percentage
+              : "",
+        }))
+      : [];
+    resetBlendRows(blendInitial);
+
+    const temperatureType = recipe.fermentationTemperature;
+    if (temperatureType !== "Mista" && recipeFermentationAmbientDurationInput) {
+      recipeFermentationAmbientDurationInput.value = "";
+    }
+
+    if (!preferment) {
+      togglePrefermentSection(recipeFermentationSelect?.value || "");
+    }
+
+    state.pendingPhoto = recipe.photo ? { ...recipe.photo } : null;
+    resetYeastSuggestion();
+    markYeastSuggestionStale();
+  }
+
+  function focusRecipeForm() {
+    window.requestAnimationFrame(() => {
+      recipeNameInput?.focus();
+      if (recipeNameInput instanceof HTMLInputElement) {
+        recipeNameInput.select();
+      }
+      newRecipeForm?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function startRecipeEdit(recipe) {
+    if (!recipe) return;
+    const normalizedType = normalizeRecipeType(recipe.type);
+    if (normalizedType !== "massa") return;
+    state.editingRecipeId = recipe.id;
+    populateNewRecipeForm(recipe);
+    updateRecipeFormMode("edit");
+    switchTab("create");
+    focusRecipeForm();
+  }
+
+  function startRecipeDuplicate(recipe) {
+    if (!recipe) return;
+    const normalizedType = normalizeRecipeType(recipe.type);
+    if (normalizedType !== "massa") return;
+    resetRecipeFormMode();
+    populateNewRecipeForm(recipe, { duplicate: true });
+    switchTab("create");
+    focusRecipeForm();
   }
 
   function handleFlourDelete(flour) {
     if (!flour || !flour.id) return;
     const label = flour.name || "Farinha sem nome";
     const shouldRemove = window.confirm(
-      `Apagar a farinha "${label}"?`
+      t('Apagar a farinha "{{name}}"?', { name: label })
     );
     if (!shouldRemove) return;
 
@@ -2554,7 +3860,7 @@
     renderFlourList();
     updateAllBlendSelectOptions();
     updateBlendTotal();
-    showFeedback(`Farinha "${label}" removida.`);
+    showFeedback(t('Farinha "{{name}}" removida.', { name: label }));
   }
 
   function buildBackupPayload() {
@@ -2580,16 +3886,18 @@
       link.click();
       document.body.removeChild(link);
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
-      showFeedback("Backup exportado. Guarde o arquivo em um local seguro.");
+      showFeedback(
+        t("Backup exportado. Guarde o arquivo em um local seguro.")
+      );
     } catch (err) {
       console.error("Falha ao exportar dados:", err);
-      showFeedback("Não foi possível exportar os dados. Tente novamente.");
+      showFeedback(t("Não foi possível exportar os dados. Tente novamente."));
     }
   }
 
   function restoreFromBackup(data) {
     if (!data || typeof data !== "object") {
-      showFeedback("O arquivo selecionado não está no formato esperado.");
+      showFeedback(t("O arquivo selecionado não está no formato esperado."));
       return;
     }
 
@@ -2597,7 +3905,9 @@
     const hasFloursArray = Array.isArray(data.flours);
     if (!hasRecipesArray && !hasFloursArray) {
       showFeedback(
-        "Nenhum dado compatível foi encontrado no arquivo. Verifique se ele foi exportado pelo Pizza App."
+        t(
+          "Nenhum dado compatível foi encontrado no arquivo. Verifique se ele foi exportado pelo Pizza App."
+        )
       );
       return;
     }
@@ -2610,10 +3920,12 @@
     const hasExistingData = state.recipes.length || state.flours.length;
     if (hasExistingData) {
       const proceed = window.confirm(
-        "Importar este arquivo vai substituir todas as receitas e farinhas atuais. Deseja continuar?"
+        t(
+          "Importar este arquivo vai substituir todas as receitas e farinhas atuais. Deseja continuar?"
+        )
       );
       if (!proceed) {
-        showFeedback("Importação cancelada.");
+        showFeedback(t("Importação cancelada."));
         return;
       }
     }
@@ -2652,13 +3964,13 @@
     updateBlendTotal();
     resetBlendRows();
     syncUI();
-    showFeedback("Dados importados com sucesso!");
+    showFeedback(t("Dados importados com sucesso!"));
   }
 
   function handleDataImportClick(event) {
     event.preventDefault();
     if (!dataImportInput) {
-      showFeedback("Importação não disponível neste navegador.");
+      showFeedback(t("Importação não disponível neste navegador."));
       return;
     }
     dataImportInput.value = "";
@@ -2673,7 +3985,9 @@
 
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      showFeedback("O arquivo excede o limite de 2MB. Verifique se selecionou o backup correto.");
+      showFeedback(
+        t("O arquivo excede o limite de 2MB. Verifique se selecionou o backup correto.")
+      );
       return;
     }
 
@@ -2681,7 +3995,7 @@
     reader.onload = () => {
       const text = typeof reader.result === "string" ? reader.result : "";
       if (!text) {
-        showFeedback("Não foi possível ler o arquivo selecionado.");
+        showFeedback(t("Não foi possível ler o arquivo selecionado."));
         return;
       }
       try {
@@ -2690,13 +4004,17 @@
       } catch (err) {
         console.error("Falha ao importar dados:", err);
         showFeedback(
-          "Arquivo inválido. Verifique se você selecionou um backup exportado pelo Pizza App."
+          t(
+            "Arquivo inválido. Verifique se você selecionou um backup exportado pelo Pizza App."
+          )
         );
       }
     };
     reader.onerror = () => {
       console.error("Falha ao ler arquivo de importação.");
-      showFeedback("Não foi possível ler o arquivo selecionado. Tente novamente.");
+      showFeedback(
+        t("Não foi possível ler o arquivo selecionado. Tente novamente.")
+      );
     };
     reader.readAsText(file, "utf-8");
   }
@@ -2997,7 +4315,7 @@
     }
 
     if (!file.type.startsWith("image/")) {
-      showFeedback("Selecione um arquivo de imagem válido.");
+      showFeedback(t("Selecione um arquivo de imagem válido."));
       clearPhotoPreview();
       return;
     }
@@ -3006,7 +4324,7 @@
     reader.onload = () => {
       const dataUrl = typeof reader.result === "string" ? reader.result : "";
       if (!dataUrl) {
-        showFeedback("Não foi possível carregar a imagem selecionada.");
+        showFeedback(t("Não foi possível carregar a imagem selecionada."));
         clearPhotoPreview();
         return;
       }
@@ -3021,11 +4339,11 @@
       updatePhotoPreview(state.pendingPhoto);
     };
 
-    reader.onerror = () => {
-      console.error("Erro ao ler a imagem selecionada.");
-      showFeedback("Não foi possível carregar a imagem selecionada.");
-      clearPhotoPreview();
-    };
+  reader.onerror = () => {
+    console.error("Erro ao ler a imagem selecionada.");
+    showFeedback(t("Não foi possível carregar a imagem selecionada."));
+    clearPhotoPreview();
+  };
 
     reader.readAsDataURL(file);
   }
@@ -3050,39 +4368,79 @@
     const content = (formData.get("otherRecipeContent") || "").toString().trim();
 
     if (!name) {
-      setOtherRecipeFeedback("Informe um nome para identificar a receita.", "error");
+      setOtherRecipeFeedback(
+        t("Informe um nome para identificar a receita."),
+        "error"
+      );
       otherRecipeNameInput?.focus();
       return;
     }
 
     if (!content) {
-      setOtherRecipeFeedback("Anote os detalhes da receita antes de salvar.", "error");
+      setOtherRecipeFeedback(
+        t("Anote os detalhes da receita antes de salvar."),
+        "error"
+      );
       otherRecipeContentInput?.focus();
       return;
     }
 
     const type = normalizeRecipeType(categoryRaw);
     const timestamp = new Date().toISOString();
-    const recipe = {
-      id: crypto.randomUUID(),
+    const recipePayload = {
       type,
       category: getRecipeTypeLabel(type),
       name,
       content,
       notes: content,
-      createdAt: timestamp,
       updatedAt: timestamp,
+    };
+
+    const isEditingOther = Boolean(state.editingOtherRecipeId);
+    if (isEditingOther) {
+      const index = state.recipes.findIndex(
+        (item) => item.id === state.editingOtherRecipeId
+      );
+      if (index === -1) {
+        resetOtherRecipeFormMode();
+        setOtherRecipeFeedback(
+          t("Receita não encontrada. Atualize a página e tente novamente."),
+          "error"
+        );
+        return;
+      }
+
+      const current = state.recipes[index];
+      const updatedRecipe = {
+        ...current,
+        ...recipePayload,
+        id: current.id,
+        type,
+        category: getRecipeTypeLabel(type),
+        createdAt: current.createdAt,
+        ratings: Array.isArray(current.ratings) ? current.ratings : [],
+      };
+
+      state.recipes[index] = updatedRecipe;
+      safeStorage.save(state.recipes);
+      syncUI();
+      toggleOtherRecipeForm(false);
+      showFeedback(t('Receita "{{name}}" atualizada.', { name }));
+      return;
+    }
+
+    const recipe = {
+      ...recipePayload,
+      id: crypto.randomUUID(),
+      createdAt: timestamp,
       ratings: [],
     };
 
     state.recipes.push(recipe);
     safeStorage.save(state.recipes);
     syncUI();
-    setOtherRecipeFeedback("Receita registrada.", "info");
-    otherRecipeForm.reset();
     toggleOtherRecipeForm(false);
-    setOtherRecipeFeedback("");
-    showFeedback(`Receita "${name}" registrada.`);
+    showFeedback(t('Receita "{{name}}" registrada.', { name }));
   }
 
   function handleOtherRecipeToggle() {
@@ -3098,6 +4456,7 @@
   }
 
   function handleNewRecipeReset() {
+    resetRecipeFormMode();
     const shouldSkip = state.skipResetEffects;
     clearPhotoPreview();
     window.requestAnimationFrame(() => {
@@ -3228,7 +4587,7 @@
     const formData = new FormData(event.currentTarget);
     const name = (formData.get("recipeName") || "").toString().trim();
     if (!name) {
-      showFeedback("Dê um nome para sua receita antes de salvar.");
+      showFeedback(t("Dê um nome para sua receita antes de salvar."));
       return;
     }
 
@@ -3237,7 +4596,7 @@
     if (styleChoice === "Outro") {
       style = (formData.get("recipeStyleCustom") || "").toString().trim();
       if (!style) {
-        showFeedback("Descreva o estilo desejado.");
+        showFeedback(t("Descreva o estilo desejado."));
         return;
       }
     } else {
@@ -3251,19 +4610,23 @@
       .trim();
 
     if (!fermentationTemperature) {
-      showFeedback("Informe a temperatura da fermentação.");
+      showFeedback(t("Informe a temperatura da fermentação."));
       return;
     }
 
     const doughCount = parseNumeric(formData.get("formulaDoughCount"));
     if (doughCount === null || doughCount <= 0) {
-      showFeedback("Informe quantas massas você precisa (valor maior que zero).");
+      showFeedback(
+        t("Informe quantas massas você precisa (valor maior que zero).")
+      );
       return;
     }
 
     const doughBallWeight = parseNumeric(formData.get("formulaDoughWeight"));
     if (doughBallWeight === null || doughBallWeight <= 0) {
-      showFeedback("Informe o peso alvo de cada massa (valor maior que zero).");
+      showFeedback(
+        t("Informe o peso alvo de cada massa (valor maior que zero).")
+      );
       return;
     }
 
@@ -3273,7 +4636,7 @@
       .toString()
       .trim();
     if (!fermentationMethod) {
-      showFeedback("Selecione o método de fermentação.");
+      showFeedback(t("Selecione o método de fermentação."));
       return;
     }
 
@@ -3285,7 +4648,7 @@
     const fermentationTime = parseNumeric(fermentationTimeInput);
     if (fermentationTime === null || fermentationTime <= 0) {
       showFeedback(
-        "Informe o tempo total de fermentação (valor maior que zero)."
+        t("Informe o tempo total de fermentação (valor maior que zero).")
       );
       return;
     }
@@ -3311,7 +4674,7 @@
     switch (fermentationTemperature) {
       case "TA": {
         if (ambientTempInput === null || !Number.isFinite(ambientTempInput)) {
-          showFeedback("Informe a temperatura ambiente média (°C).");
+          showFeedback(t("Informe a temperatura ambiente média (°C)."));
           return;
         }
         temperatureDetails.ambient = ambientTempInput;
@@ -3324,7 +4687,7 @@
           controlledTempInput === null ||
           !Number.isFinite(controlledTempInput)
         ) {
-          showFeedback("Informe a temperatura da geladeira (°C).");
+          showFeedback(t("Informe a temperatura da geladeira (°C)."));
           return;
         }
         temperatureDetails.ambient = ambientTempInput;
@@ -3335,14 +4698,14 @@
       }
       case "Mista": {
         if (ambientTempInput === null || !Number.isFinite(ambientTempInput)) {
-          showFeedback("Informe a temperatura ambiente média (°C).");
+          showFeedback(t("Informe a temperatura ambiente média (°C)."));
           return;
         }
         if (
           controlledTempInput === null ||
           !Number.isFinite(controlledTempInput)
         ) {
-          showFeedback("Informe a temperatura da geladeira (°C).");
+          showFeedback(t("Informe a temperatura da geladeira (°C)."));
           return;
         }
         if (
@@ -3351,7 +4714,9 @@
           ambientPhaseTimeInput >= fermentationTime
         ) {
           showFeedback(
-            "Informe o tempo em temperatura ambiente (maior que 0 e menor que o tempo total)."
+            t(
+              "Informe o tempo em temperatura ambiente (maior que 0 e menor que o tempo total)."
+            )
           );
           return;
         }
@@ -3361,7 +4726,7 @@
         );
         if (controlledPhaseDuration <= 0) {
           showFeedback(
-            "O tempo em temperatura controlada precisa ser maior que zero."
+            t("O tempo em temperatura controlada precisa ser maior que zero.")
           );
           return;
         }
@@ -3379,7 +4744,7 @@
       ? Array.from(flourBlendList.querySelectorAll(".flour-blend__row"))
       : [];
     if (!blendRows.length) {
-      showFeedback("Adicione ao menos uma farinha ao blend.");
+      showFeedback(t("Adicione ao menos uma farinha ao blend."));
       return;
     }
 
@@ -3394,12 +4759,12 @@
       const percentageRaw = parseNumeric(percentageInput?.value);
 
       if (!selection) {
-        showFeedback("Selecione a farinha em cada linha do blend.");
+        showFeedback(t("Selecione a farinha em cada linha do blend."));
         return;
       }
 
       if (percentageRaw === null || percentageRaw <= 0) {
-        showFeedback("Informe o percentual de cada farinha utilizada.");
+        showFeedback(t("Informe o percentual de cada farinha utilizada."));
         return;
       }
 
@@ -3409,7 +4774,7 @@
       if (selection === "custom") {
         const customName = (customInput?.value || "").toString().trim();
         if (!customName) {
-          showFeedback("Informe o nome da farinha personalizada no blend.");
+          showFeedback(t("Informe o nome da farinha personalizada no blend."));
           return;
         }
         blend.push({
@@ -3421,7 +4786,9 @@
         const flour = state.flours.find((item) => item.id === selection);
         if (!flour) {
           showFeedback(
-            "Não encontramos uma das farinhas selecionadas. Atualize a página e tente novamente."
+            t(
+              "Não encontramos uma das farinhas selecionadas. Atualize a página e tente novamente."
+            )
           );
           return;
         }
@@ -3443,7 +4810,9 @@
     const blendRoundedTotal = Math.round(blendPercentageTotal * 10) / 10;
     if (Math.abs(blendRoundedTotal - 100) > 0.5) {
       showFeedback(
-        "Os percentuais das farinhas precisam somar 100%. Ajuste o blend antes de continuar."
+        t(
+          "Os percentuais das farinhas precisam somar 100%. Ajuste o blend antes de continuar."
+        )
       );
       return;
     }
@@ -3479,11 +4848,11 @@
       120
     );
     if (waterPct === null || typeof waterPct === "object") {
-      showFeedback("Informe a hidratação da massa (0% a 120%).");
+      showFeedback(t("Informe a hidratação da massa (0% a 120%)."));
       return;
     }
     if (waterPct <= 0) {
-      showFeedback("A hidratação deve ser maior que 0%.");
+      showFeedback(t("A hidratação deve ser maior que 0%."));
       return;
     }
 
@@ -3492,24 +4861,26 @@
       15
     );
     if (saltPctRaw === null) {
-      showFeedback("Informe o percentual de sal.");
+      showFeedback(t("Informe o percentual de sal."));
       return;
     }
     if (typeof saltPctRaw === "object") {
-      showFeedback("O percentual de sal deve estar entre 0% e 15%.");
+      showFeedback(t("O percentual de sal deve estar entre 0% e 15%."));
       return;
     }
     const saltPct = saltPctRaw;
 
     const yeastWeight = parseNumeric(formData.get("formulaYeastGrams"));
     if (yeastWeight === null || yeastWeight < 0) {
-      showFeedback("Informe a quantidade de fermento em gramas (valor positivo).");
+      showFeedback(
+        t("Informe a quantidade de fermento em gramas (valor positivo).")
+      );
       return;
     }
 
     const fatPctRaw = parsePositivePercentage(formData.get("formulaFatPct"), 25);
     if (fatPctRaw && typeof fatPctRaw === "object") {
-      showFeedback("O percentual de gordura deve estar entre 0% e 25%.");
+      showFeedback(t("O percentual de gordura deve estar entre 0% e 25%."));
       return;
     }
     const fatPct = fatPctRaw;
@@ -3519,7 +4890,7 @@
       25
     );
     if (sugarPctRaw && typeof sugarPctRaw === "object") {
-      showFeedback("O percentual de açúcares deve estar entre 0% e 25%.");
+      showFeedback(t("O percentual de açúcares deve estar entre 0% e 25%."));
       return;
     }
     const sugarPct = sugarPctRaw;
@@ -3543,7 +4914,7 @@
     }
 
     if (totalFlour === null || totalFlour <= 0) {
-      showFeedback("Informe a quantidade total de farinha (em gramas).");
+      showFeedback(t("Informe a quantidade total de farinha (em gramas)."));
       return;
     }
 
@@ -3564,19 +4935,21 @@
         inoculationValue >= 100
       ) {
         showFeedback(
-          "Informe a inoculação do pré-fermento entre 0% e 100% (exclusivo)."
+          t("Informe a inoculação do pré-fermento entre 0% e 100% (exclusivo).")
         );
         return;
       }
       if (hydrationValue === null || hydrationValue < 0 || hydrationValue > 200) {
-        showFeedback("Informe a hidratação do pré-fermento entre 0% e 200%.");
+        showFeedback(t("Informe a hidratação do pré-fermento entre 0% e 200%."));
         return;
       }
 
       prefermentFlourRaw = totalFlour * (inoculationValue / 100);
       if (prefermentFlourRaw >= totalFlour) {
         showFeedback(
-          "A inoculação do pré-fermento deve representar menos que 100% da farinha total."
+          t(
+            "A inoculação do pré-fermento deve representar menos que 100% da farinha total."
+          )
         );
         return;
       }
@@ -3585,7 +4958,9 @@
       const totalWaterRaw = totalFlour * (waterPct / 100);
       if (prefermentWaterRaw > totalWaterRaw) {
         showFeedback(
-          "A água do pré-fermento excede a água total da massa. Ajuste os valores."
+          t(
+            "A água do pré-fermento excede a água total da massa. Ajuste os valores."
+          )
         );
         return;
       }
@@ -3628,7 +5003,9 @@
     const mixWaterRaw = totalWaterRaw - prefermentWaterRaw;
     if (mixFlourRaw < 0 || mixWaterRaw < 0) {
       showFeedback(
-        "Verifique os valores do pré-fermento: sobrou farinha ou água negativa na massa final."
+        t(
+          "Verifique os valores do pré-fermento: sobrou farinha ou água negativa na massa final."
+        )
       );
       return;
     }
@@ -3712,8 +5089,7 @@
     };
     formula.targetDoughWeight = roundOrNull(desiredDoughWeight);
 
-    const recipe = {
-      id: crypto.randomUUID(),
+    const recipePayload = {
       type: "massa",
       category: getRecipeTypeLabel("massa"),
       name,
@@ -3742,8 +5118,52 @@
       photo: state.pendingPhoto ? { ...state.pendingPhoto } : null,
       notes,
       content: notes,
-      createdAt: timestamp,
       updatedAt: timestamp,
+    };
+
+    const isEditingRecipe = Boolean(state.editingRecipeId);
+    if (isEditingRecipe) {
+      const index = state.recipes.findIndex(
+        (item) => item.id === state.editingRecipeId
+      );
+      if (index === -1) {
+        resetRecipeFormMode();
+        showFeedback(
+          t(
+            "Receita não encontrada. Atualize a página e tente novamente."
+          )
+        );
+        return;
+      }
+
+      const currentRecipe = state.recipes[index];
+      const updatedRecipe = {
+        ...currentRecipe,
+        ...recipePayload,
+        id: currentRecipe.id,
+        type: "massa",
+        category: getRecipeTypeLabel("massa"),
+        createdAt: currentRecipe.createdAt,
+        ratings: Array.isArray(currentRecipe.ratings)
+          ? currentRecipe.ratings
+          : [],
+      };
+
+      state.recipes[index] = updatedRecipe;
+      safeStorage.save(state.recipes);
+      syncUI();
+      resetRecipeFormMode();
+      state.skipResetEffects = true;
+      event.currentTarget.reset();
+      showSuccessSummary(updatedRecipe);
+      state.skipResetEffects = false;
+      return;
+    }
+
+    const recipe = {
+      ...recipePayload,
+      id: crypto.randomUUID(),
+      createdAt: timestamp,
       ratings: [],
     };
 
@@ -3980,6 +5400,21 @@
         activeRecipeDetail = null;
       });
     }
+
+    if (languageSelector) {
+      languageSelector.value = currentLocale;
+      languageSelector.addEventListener("change", (event) => {
+        const target = event.currentTarget;
+        if (!(target instanceof HTMLSelectElement)) return;
+        const nextLocale = supportedLocales.includes(target.value)
+          ? target.value
+          : defaultLocale;
+        applyLocale(nextLocale);
+        syncUI();
+      });
+    }
+
+    applyLocale(currentLocale, { persist: false });
   }
 
   document.addEventListener("DOMContentLoaded", init);

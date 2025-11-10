@@ -1,12 +1,3 @@
-
-- Inverter a ordem dos cards, primeiro o "nome da receita" e depois o card de estilo da pizza
-
-Vamos fazer alguns ajustes de texto agora. 
-
-- De: "Construa a massa como um padeiro: defina o estilo, escolha a farinha, planeje a fermentação e feche a fórmula de padeiro". 
-  Para: "Construa a sua receita: defina o estilo, escolha a farinha, planeje a fermentação e receba no final a fórmula de padeiro". 
-
-
-- De: "Qual estilo você quer atingir?". 
-  Para: "Qual será o estilo da sua pizza". 
-
+- Botão de editar as receitas
+- Botão de duplicar as receitas
+- A parte de "Other recipes" tem elementos que ainda estão em português mesmo quando selecionado o idioma Inglês
